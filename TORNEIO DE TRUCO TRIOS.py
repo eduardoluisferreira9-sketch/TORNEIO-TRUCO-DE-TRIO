@@ -27,8 +27,7 @@ TEMPO_CRONOMETRO_MINUTOS = 120  # ⏰ Ajustado rigorosamente para 2 horas (120 m
 st.markdown("""
     <style>
     .stApp { 
-        background: radial-gradient(circle, #0e3b23 0%, #061c10 100%) !important; 
-    } 
+        background: radial-gradient(circle, #0e3b23 0%, #061c10 100%) !important; \n    } 
     
     section[data-testid="stSidebar"] {
         background-color: #04120a !important;
@@ -237,7 +236,7 @@ def carregar_estado_do_disco():
 
 carregar_estado_do_disco()
 
-def reconstruir_classificacao_global():
+def reconstruction_classificacao_global():
     labels_trios = [obter_label_trio(t) for t in st.session_state["trios_dados"]]
     st.session_state["classificacao"] = pd.DataFrame({
         'Trio (Entidade)': labels_trios, 'Vitorias': 0, 'Sets_Ganhos': 0, 
@@ -339,7 +338,7 @@ def salvar_mudanca_retroativa(r_alvo, m_id, j1, j2):
     st.session_state["historico_rodadas"][r_alvo][m_id]["s2"] = st.session_state.get(f"ret_s2_{r_alvo}_{m_id}", 0)
     st.session_state["historico_rodadas"][r_alvo][m_id]["t2"] = st.session_state.get(f"ret_t2_{r_alvo}_{m_id}", 0)
     st.session_state["historico_rodadas"][r_alvo][m_id]["f2"] = st.session_state.get(f"ret_f2_{r_alvo}_{m_id}", 0)
-    reconstruir_classificacao_global()
+    reconstruction_classificacao_global()
 
 # --- CARDS MESA COM DISTRIBUIÇÃO INTERCALADA OFICIAL ---
 def desenhar_mesa_planta_baixa(j1, j2, mesa_num, s1, t1, f1, s2, t2, f2, tipo_jogo="normal"):
@@ -526,29 +525,41 @@ with st.sidebar:
     st.markdown("---")
     
     if is_admin:
-        # Botão dinâmico lendo a constante global regulamentada para 120 minutos
         if st.button(f"⏱️ Iniciar Cronômetro ({TEMPO_CRONOMETRO_MINUTOS}m)"):
             st.session_state["hora_inicio_rodada"] = datetime.now()
             st.session_state["cronometro_ativo"] = True
-            salvar_estado_no_disco(); st.rerun()
+            salvar_estado_no_disco()
+            st.rerun()
         if st.button("⏹️ Pausar Cronômetro"):
             st.session_state["cronometro_ativo"] = False
-            salvar_estado_no_disco(); st.rerun()
+            salvar_estado_no_disco()
+            st.rerun()
         st.markdown("---")
         if st.button("🚨 RESET TOTAL DO EVENTO"):
             if os.path.exists(ARQUIVO_BACKUP): os.remove(ARQUIVO_BACKUP)
-            st.session_state.clear(); st.rerun()
+            st.session_state.clear()
+            st.rerun()
 
 # --- RENDERS PRINCIPAIS ---
 st.markdown(f"<h1 style='text-align:center; color:#ffb703; font-weight:900; margin-top:0;'>🃏 {st.session_state.get('nome_torneio', 'Torneio de Truco em Trios')}</h1>", unsafe_allow_html=True)
 
 modo_exibicao = st.radio("Selecione o Modo de Visualização da Tela:", ["Arena de Gerenciamento", "🖥️ MODO TELÃO DE PROJETOR (Automático)"], horizontal=True)
 
+# 🕒 RECURSO DE AUTO-REFRESH UNIFICADO (ESSENCIAL PARA O CRONÔMETRO FUNCIONAR EM TEMPO REAL)
+if st.session_state["cronometro_ativo"] and st.session_state["hora_inicio_rodada"]:
+    tl = st.session_state["hora_inicio_rodada"] + timedelta(minutes=TEMPO_CRONOMETRO_MINUTOS)
+    tr = tl - datetime.now()
+    if tr.total_seconds() > 0:
+        # Se estiver ativo, força a tela a atualizar a cada 1 segundo (1000ms) para rodar o tempo real
+        components.html("<script>setTimeout(function(){ window.parent.location.reload(); }, 1000);</script>", height=0)
+    else:
+        st.session_state["cronometro_ativo"] = False
+        salvar_estado_no_disco()
+
 if modo_exibicao == "🖥️ MODO TELÃO DE PROJETOR (Automático)":
     st.markdown("<h2 style='text-align:center; color:#ffb703; margin-bottom:20px;'>📺 QUADRO OFICIAL DE CONFRONTOS</h2>", unsafe_allow_html=True)
     
-    if st.session_state["cronometro_ativo"] and st.session_state["hora_inicio_rodada"]:
-        # Cálculo exato baseado na constante de 120 minutos (2 Horas)
+    if st.session_state["hora_inicio_rodada"]:
         tl = st.session_state["hora_inicio_rodada"] + timedelta(minutes=TEMPO_CRONOMETRO_MINUTOS)
         tr = tl - datetime.now()
         if tr.total_seconds() > 0:
@@ -589,13 +600,20 @@ if modo_exibicao == "🖥️ MODO TELÃO DE PROJETOR (Automático)":
                         desenhar_mesa_planta_baixa(c["j1"], c["j2"], c["id_original"], p[0], p[2], p[4], p[1], p[3], p[5], tipo_jogo="normal")
     else:
         st.info("Aguardando o início do torneio pela arbitragem para projetar as chaves.")
-        
-    components.html("<script>setTimeout(function(){ window.parent.location.reload(); }, 10000);</script>", height=0)
 
 else:
     aba_arena, aba_tabela, aba_historico = st.tabs(["⚔️ Arena de Confrontos", "📊 Classificação & Auditoria", "📜 Galeria de Campeões"])
 
     with aba_arena:
+        # Seletor visual do cronômetro direto na aba administrativa para controle em tempo real
+        if st.session_state["hora_inicio_rodada"]:
+            tl = st.session_state["hora_inicio_rodada"] + timedelta(minutes=TEMPO_CRONOMETRO_MINUTOS)
+            tr = tl - datetime.now()
+            if tr.total_seconds() > 0:
+                st.markdown(f'<div class="cronometro-box-gigante" style="padding: 10px; margin-bottom: 15px;"><span style="color:#ffffff; font-size:0.85rem; font-weight:bold; text-transform:uppercase;">⏱️ Cronômetro da Rodada Ativo</span><div class="cronometro-tempo" style="font-size: 2rem !important;">{int(tr.total_seconds()//3600):02d}:{int((tr.total_seconds()%3600)//60):02d}:{int(tr.total_seconds()%60):02d}</div></div>', unsafe_allow_html=True)
+            else:
+                st.markdown('<div class="cronometro-box-gigante" style="padding: 10px; margin-bottom: 15px; border-color:#ff3232;"><div class="cronometro-tempo" style="color:#ff3232 !important; font-size: 2rem !important;">⏰ TEMPO REGULAMENTAR ESGOTADO</div></div>', unsafe_allow_html=True)
+
         if not st.session_state["torneio_iniciado"]:
             st.markdown("### 🎮 Inscrições de Trios Competidores")
             nome_t = st.text_input("Nome Customizado do Torneio:", value=st.session_state["nome_torneio"])
@@ -613,7 +631,8 @@ else:
                                 if n_nome.strip() and n_entidade.strip():
                                     st.session_state["trios_dados"][idx_edit] = {"nome": n_nome.strip(), "entidade": n_entidade.strip()}
                                     st.session_state["trio_sendo_editado"] = None
-                                    salvar_estado_no_disco(); st.rerun()
+                                    salvar_estado_no_disco()
+                                    st.rerun()
                         with col_b2:
                             if st.form_submit_button("❌ Cancelar"): st.session_state["trio_sendo_editado"] = None; st.rerun()
                 else:
@@ -630,7 +649,8 @@ else:
                                     "nome": input_nome_trio.strip(),
                                     "entidade": input_nome_entidade.strip()
                                 })
-                                salvar_estado_no_disco(); st.rerun()
+                                salvar_estado_no_disco()
+                                st.rerun()
                             else:
                                 st.error("Por favor, preencha ambos os campos para registrar.")
                             
@@ -649,16 +669,18 @@ else:
                             st.markdown('<div class="botao-excluir">', unsafe_allow_html=True)
                             if st.button("🗑️", key=f"btn_del_{idx}"):
                                 st.session_state["trios_dados"].pop(idx)
-                                salvar_estado_no_disco(); st.rerun()
+                                salvar_estado_no_disco()
+                                st.rerun()
                             st.markdown('</div>', unsafe_allow_html=True)
                 
             if is_admin and len(st.session_state["trios_dados"]) >= 4:
                 st.markdown("---")
                 if st.button("🃏 GERAR CHAVES E DISPARAR TORNEIO"):
                     st.session_state["nome_torneio"] = nome_t
-                    reconstruir_classificacao_global()
+                    reconstruction_classificacao_global()
                     st.session_state["torneio_iniciado"] = True
-                    gerar_rodada_web(); st.rerun()
+                    gerar_rodada_web()
+                    st.rerun()
         else:
             c_m1, c_m2, c_m3 = st.columns(3)
             with c_m1: st.markdown(f'<div class="metric-panel"><div class="metric-val">{len(st.session_state["trios_dados"])}</div><div class="metric-lbl">Trios na Arena</div></div>', unsafe_allow_html=True)
@@ -772,7 +794,7 @@ else:
                                         p = st.session_state["placares_rodada_atual"].get(str(m_c), [0,0,0,0,0,0,False])
                                         st.session_state["historico_rodadas"][id_r_str][str(m_c)] = {"is_chapeu": False, "j1": j1, "j2": j2, "s1": p[0], "s2": p[1], "t1": p[2], "t2": p[3], "f1": p[4], "f2": p[5]}
                                         m_c += 1
-                                reconstruir_classificacao_global()
+                                reconstruction_classificacao_global()
                                 st.session_state["rodada_atual"] += 1
                                 if st.session_state["rodada_atual"] <= 5: gerar_rodada_web()
                                 else:
@@ -817,7 +839,8 @@ else:
                                     st.session_state["fase_matamata"] = "FINAL E TERCEIRO"
                                     st.session_state["confrontos_mm"] = [{"id_original": "1", "tipo": "final", "j1": venc[0], "j2": venc[1]}, {"id_original": "2", "tipo": "3place", "j1": perd[0], "j2": perd[1]}]
                                     st.session_state["placares_rodada_atual"] = {"1": [0,0,0,0,0,0,False], "2": [0,0,0,0,0,0,False]}
-                                salvar_estado_no_disco(); st.rerun()
+                                salvar_estado_no_disco()
+                                st.rerun()
 
     with aba_tabela:
         if st.session_state["classificacao"] is not None:
@@ -878,7 +901,7 @@ st.markdown("""
             🚀 Desenvolvido por: <span style="color: #ffb703; font-weight: 900; letter-spacing: 0.5px;">Eduardo Luis Ferreira</span>
         </div>
         <div style="color: #ffffff; font-size: 0.85rem; font-weight: bold; display: flex; gap: 15px; align-items: center; text-shadow: 1px 1px 2px #000;">
-            <span>📦 Versão: <span style="color: #ffb703; font-weight: 900;">3.7.5-Cronometro_2H</span></span>
+            <span>📦 Versão: <span style="color: #ffb703; font-weight: 900;">3.7.6-Cronometro_Fixo</span></span>
             <span style="color: #ffb703; font-weight: 900;">|</span>
             <span style="color: #69db7c; font-weight: 900; display: inline-flex; align-items: center; gap: 4px;">🟢 Central de Trios Online</span>
             <span style="color: #ffb703; font-weight: 900;">|</span>
