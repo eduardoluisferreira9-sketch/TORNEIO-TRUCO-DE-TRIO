@@ -72,7 +72,7 @@ st.markdown("""
     }
     
     div[data-testid="stNumberInput"] label, div[data-testid="stTextInput"] label {
-        color: #69db7c !important; /* Verde Menta Fluorescente para total leitura */
+        color: #69db7c !important; 
         font-size: 0.85rem !important;
         font-weight: bold !important;
         text-transform: uppercase;
@@ -154,7 +154,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- CONFIGURAÇÃO INICIAL RIGOROSA DOS ATRIBUTOS DE SESSÃO ---
-if "jogadores" not in st.session_state: st.session_state["jogadores"] = []  # Agora representam os Trios
+if "jogadores" not in st.session_state: st.session_state["jogadores"] = []  
 if "torneio_iniciado" not in st.session_state: st.session_state["torneio_iniciado"] = False
 if "rodada_atual" not in st.session_state: st.session_state["rodada_atual"] = 1
 if "classificacao" not in st.session_state: st.session_state["classificacao"] = None
@@ -175,8 +175,6 @@ if "semente_reset" not in st.session_state: st.session_state["semente_reset"] = 
 if "nome_torneio" not in st.session_state: st.session_state["nome_torneio"] = "Torneio de Truco"
 if "jogador_sendo_editado" not in st.session_state: st.session_state["jogador_sendo_editado"] = None
 if "admin_logado" not in st.session_state: st.session_state["admin_logado"] = False
-
-# --- ESTRUTURA PARA INDIVÍDUOS QUE CANTARAM FLOR (DESVINCULADO DOS TRIOS) ---
 if "flores_individuais" not in st.session_state: st.session_state["flores_individuais"] = {}
 
 # --- FUNÇÃO DE LIMPEZA DE MEMÓRIA ---
@@ -342,7 +340,7 @@ def salvar_mudanca_retroativa(r_alvo, m_id, j1, j2):
     st.session_state["historico_rodadas"][r_alvo][m_id]["t2"] = st.session_state.get(f"ret_t2_{r_alvo}_{m_id}", 0)
     reconstruir_classificacao_global()
 
-# --- CARDS DINÂMICOS DE MESA COM STATUS COLORIDO (PLANTA BAIXA PREMIUM) ---
+# --- CARDS DINÂMICOS DE MESA COM STATUS COLORIDO ---
 def desenhar_mesa_planta_baixa(j1, j2, mesa_num, s1, t1, s2, t2, tipo_jogo="normal"):
     animacao_css = ""
     if tipo_jogo == "final":
@@ -407,7 +405,7 @@ def desenhar_mesa_planta_baixa(j1, j2, mesa_num, s1, t1, s2, t2, tipo_jogo="norm
     """
     components.html(html_mesa, height=int(card_height.replace("px","")) + 15, scrolling=False)
 
-# --- CONFIGURAÇÃO DO FORMULÁRIO DO PAINEL DE CONTROLE DE ENTRADAS ---
+# --- PAINEL DE CONTROLE DE ENTRADAS ---
 def renderizar_formulario_mesa_admin(m, j1, j2, sem_id):
     p = st.session_state["placares_rodada_atual"].get(m, [0,0,0,0,False])
     s1, s2, t1, t2 = p[0], p[1], p[2], p[3]
@@ -435,7 +433,6 @@ def renderizar_formulario_mesa_admin(m, j1, j2, sem_id):
                 st.text_input(f"Tentos - {j1}", value=t1_val_str, key=f"dir_t1_{m}_r{sem_id}_2x1", on_change=disparar_atualizacao_placar, args=(m, j1, j2), placeholder="Tentos...")
                 st.text_input(f"Tentos - {j2}", value=t2_val_str, key=f"dir_t2_{m}_r{sem_id}_2x1", on_change=disparar_atualizacao_placar, args=(m, j1, j2), placeholder="Tentos...")
             
-            # 🌸 NOVO PASSO 3: ENTRADA DE TEXTO DO INDIVÍDUO QUE CANTOU FLOR
             st.markdown(f"<h4 class='titulo-passo-admin'>• 🌸 FLOR INDIVIDUAL (Passo 3)</h4>", unsafe_allow_html=True)
             st.text_input("Nome do Competidor que cantou Flor nesta mesa (Opcional):", key=f"flor_ind_{m}_r{sem_id}", placeholder="Ex: João Silva")
 
@@ -459,14 +456,25 @@ with st.sidebar:
     st.markdown("---")
     
     if is_admin:
-        if st.button("⏱️ Iniciar Cronômetro (45m)"):
+        # CORREÇÃO 1: Cronómetro alterado para 2 Horas
+        if st.button("⏱️ Iniciar Cronómetro (2h)"):
             st.session_state["hora_inicio_rodada"] = datetime.now()
             st.session_state["cronometro_ativo"] = True
             salvar_estado_no_disco(); st.rerun()
-        if st.button("⏹️ Pausar Cronômetro"):
+        if st.button("⏹️ Pausar Cronómetro"):
             st.session_state["cronometro_ativo"] = False
             salvar_estado_no_disco(); st.rerun()
         st.markdown("---")
+        
+        # CORREÇÃO 2: Botão de Reset da Galeria Adicionado com Sucesso
+        st.markdown('<div class="botao-excluir">', unsafe_allow_html=True)
+        if st.button("🗑️ Limpar Galeria de Campeões"):
+            if os.path.exists(ARQUIVO_GALERIA):
+                os.remove(ARQUIVO_GALERIA)
+            st.success("Galeria redefinida!")
+            st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
+        
         if st.button("🚨 RESET TOTAL DO EVENTO"):
             if os.path.exists(ARQUIVO_BACKUP): os.remove(ARQUIVO_BACKUP)
             st.session_state.clear(); st.rerun()
@@ -474,22 +482,20 @@ with st.sidebar:
 # --- INTERFACE PRINCIPAL ---
 st.markdown(f"<h1 style='text-align:center; color:#ffb703; font-weight:900; margin-top:0;'>🃏 {st.session_state.get('nome_torneio', 'Torneio de Truco')}</h1>", unsafe_allow_html=True)
 
-# SELETOR DE MODO DE EXIBIÇÃO (ARENA VS TELÃO AUTOMÁTICO DE PROJETOR)
 modo_exibicao = st.radio("Selecione o Modo de Visualização da Tela:", ["Arena de Gerenciamento", "🖥️ MODO TELÃO DE PROJETOR (Automático)"], horizontal=True)
 
 if modo_exibicao == "🖥️ MODO TELÃO DE PROJETOR (Automático)":
     st.markdown("<h2 style='text-align:center; color:#ffb703; margin-bottom:20px;'>📺 QUADRO OFICIAL DE CONFRONTOS DE TRIOS</h2>", unsafe_allow_html=True)
     
-    # 1. Cronômetro Gigante Centralizado
+    # CORREÇÃO 1: Tempo do projetor atualizado matematicamente para base de 2 Horas (120 minutos)
     if st.session_state["cronometro_ativo"] and st.session_state["hora_inicio_rodada"]:
-        tl = st.session_state["hora_inicio_rodada"] + timedelta(minutes=45)
+        tl = st.session_state["hora_inicio_rodada"] + timedelta(hours=2)
         tr = tl - datetime.now()
         if tr.total_seconds() > 0:
             st.markdown(f'<div class="cronometro-box-gigante"><span style="color:#ffffff; font-size:1.1rem; font-weight:bold; text-transform:uppercase; letter-spacing:2px; display:block; margin-bottom:5px;">⏱️ Tempo Restante de Jogo</span><div class="cronometro-tempo">{int(tr.total_seconds()//60):02d}:{int(tr.total_seconds()%60):02d}</div></div>', unsafe_allow_html=True)
         else:
             st.markdown('<div class="cronometro-box-gigante" style="border-color:#ff3232;"><div class="cronometro-tempo" style="color:#ff3232 !important;">⏰ TEMPO ESGOTADO</div></div>', unsafe_allow_html=True)
     
-    # 2. Grid de Mesas em Tamanho Gigante
     if st.session_state["torneio_iniciado"]:
         if not st.session_state["em_matamata"]:
             grid_telao = st.columns(3)
@@ -587,7 +593,6 @@ else:
                 fase_txt = f"Rodada {st.session_state['rodada_atual']} / 5" if not st.session_state["em_matamata"] else str(st.session_state["fase_matamata"])
                 st.markdown(f'<div class="metric-panel"><div class="metric-val">{fase_txt}</div><div class="metric-lbl">Estágio Atual</div></div>', unsafe_allow_html=True)
             with c_m3:
-                # LÓGICA DE DETECÇÃO DO REI DA FLOR INDIVIDUAL
                 if st.session_state["flores_individuais"]:
                     rei_f = max(st.session_state["flores_individuais"], key=st.session_state["flores_individuais"].get)
                     qtd_f = st.session_state["flores_individuais"][rei_f]
@@ -663,8 +668,9 @@ else:
                     with open(ARQUIVO_GALERIA, "w", encoding="utf-8") as f: json.dump(lista_g, f, ensure_ascii=False, indent=4)
                     st.success("Resultados imortalizados!")
             else:
+                # CORREÇÃO 1: Ajuste matemático de 2 horas na tela de gerenciamento
                 if st.session_state["cronometro_ativo"] and st.session_state["hora_inicio_rodada"]:
-                    tl = st.session_state["hora_inicio_rodada"] + timedelta(minutes=45)
+                    tl = st.session_state["hora_inicio_rodada"] + timedelta(hours=2)
                     tr = tl - datetime.now()
                     if tr.total_seconds() > 0:
                         st.markdown(f'<div class="cronometro-box-gigante"><div class="cronometro-tempo">{int(tr.total_seconds()//60):02d}:{int(tr.total_seconds()%60):02d}</div></div>', unsafe_allow_html=True)
@@ -702,7 +708,6 @@ else:
                                     if not (p[0] == 2 or p[1] == 2): st.error(f"❌ Mesa {m_c}: Partida incompleta!"); erro_v = True
                                     m_c += 1
                             if not erro_v:
-                                # CONTABILIZAR AS FLORES INDIVIDUAIS INPUTADAS ANTES DE FECHAR A RODADA
                                 m_c = 1
                                 for j1, j2 in st.session_state["confrontos"]:
                                     if j2 != "CHAPÉU (Folga)":
@@ -748,7 +753,6 @@ else:
                                 p = st.session_state["placares_rodada_atual"].get(c["id_original"], [0,0,0,0,False])
                                 if not (p[0] == 2 or p[1] == 2): st.error(f"❌ Partida pendente na mesa {c['id_original']}!"); erro_mm = True
                             if not erro_mm:
-                                # CONTABILIZAR AS FLORES INDIVIDUAIS DOS PLAYOFFS ANTES DE AVANÇAR
                                 for c in st.session_state["confrontos_mm"]:
                                     nome_canto = st.session_state.get(f"flor_ind_{c['id_original']}_r{sem_id}", "").strip()
                                     if nome_canto:
@@ -812,18 +816,20 @@ else:
         if os.path.exists(ARQUIVO_GALERIA):
             try:
                 with open(ARQUIVO_GALERIA, "r", encoding="utf-8") as f: dg = json.load(f)
-                for reg in reversed(dg):
-                    st.markdown(f"""
-                        <div style="background: linear-gradient(135deg, #0d301b, #04120a); border: 2px solid #ffb703; border-radius: 12px; padding: 15px; margin-bottom: 15px;">
-                            <b style="color:#ffb703;">🏆 {reg.get('Torneio')}</b> <span style="float:right; color:#69db7c;">📅 {reg.get('Data')}</span><br>
-                            <span style="color:#ffffff;">🥇 Trio Campeão: {reg.get('Campeao')} | 🥈 Vice: {reg.get('Vice')}</span><br>
-                            <span style="color:#ff69b4; font-weight:bold;">🌸 Maior Cantador de Flor: {reg.get('ReiDaFlor')}</span>
-                        </div>
-                    """, unsafe_allow_html=True)
+                if dg:
+                    for reg in reversed(dg):
+                        st.markdown(f"""
+                            <div style="background: linear-gradient(135deg, #0d301b, #04120a); border: 2px solid #ffb703; border-radius: 12px; padding: 15px; margin-bottom: 15px;">
+                                <b style="color:#ffb703;">🏆 {reg.get('Torneio')}</b> <span style="float:right; color:#69db7c;">📅 {reg.get('Data')}</span><br>
+                                <span style="color:#ffffff;">🥇 Trio Campeão: {reg.get('Campeao')} | 🥈 Vice: {reg.get('Vice')}</span><br>
+                                <span style="color:#ff69b4; font-weight:bold;">🌸 Maior Cantador de Flor: {reg.get('ReiDaFlor')}</span>
+                            </div>
+                        """, unsafe_allow_html=True)
+                else: st.info("Galeria vazia.")
             except Exception: st.info("Galeria vazia.")
         else: st.info("Nenhum torneio imortalizado ainda.")
 
-# --- RODAPÉ INSTITUCIONAL PROFISSIONAL DE ULTRA CONTRASTE (SEM CINZA) ---
+# --- RODAPÉ INSTITUCIONAL ---
 st.markdown("""
     <hr style="border: 0; border-top: 1px solid rgba(255, 183, 3, 0.4); margin-top: 60px; margin-bottom: 15px;">
     <div style="
@@ -842,7 +848,7 @@ st.markdown("""
             🚀 Desenvolvido por: <span style="color: #ffb703; font-weight: 900; letter-spacing: 0.5px;">Eduardo Luis Ferreira</span>
         </div>
         <div style="color: #ffffff; font-size: 0.85rem; font-weight: bold; display: flex; gap: 15px; align-items: center; text-shadow: 1px 1px 2px #000;">
-            <span>📦 Versão: <span style="color: #ffb703; font-weight: 900;">2.7.0-Stable</span></span>
+            <span>📦 Versão: <span style="color: #ffb703; font-weight: 900;">2.8.2-Stable</span></span>
             <span style="color: #ffb703; font-weight: 900;">|</span>
             <span style="color: #69db7c; font-weight: 900; display: inline-flex; align-items: center; gap: 4px;">🟢 Sistema Online</span>
             <span style="color: #ffb703; font-weight: 900;">|</span>
