@@ -65,7 +65,7 @@ st.markdown("""
     }
     
     /* Inputs Estilizados */
-    div[data-testid="stTextInput"] input, div[data-testid="stNumberInput"] input {
+    div[data-testid="stTextInput"] input, div[data-testid="stNumberInput"] input, div[data-testid="stSelectbox"] div {
         color: #ffffff !important;
         background-color: #071c11 !important;
         border: 2px solid #ffb703 !important;
@@ -75,7 +75,7 @@ st.markdown("""
         border-radius: 8px !important;
     }
     
-    div[data-testid="stNumberInput"] label, div[data-testid="stTextInput"] label {
+    div[data-testid="stNumberInput"] label, div[data-testid="stTextInput"] label, div[data-testid="stSelectbox"] label {
         color: #69db7c !important; /* Verde Menta Fluorescente para total leitura */
         font-size: 0.85rem !important;
         font-weight: bold !important;
@@ -158,7 +158,9 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- CONFIGURAÇÃO INICIAL RIGOROSA DOS ATRIBUTOS DE SESSÃO ---
+if "entidades" not in st.session_state: st.session_state["entidades"] = []
 if "jogadores" not in st.session_state: st.session_state["jogadores"] = []
+if "vinc_entidades" not in st.session_state: st.session_state["vinc_entidades"] = {} # Mapeamento Jogador -> Entidade
 if "torneio_iniciado" not in st.session_state: st.session_state["torneio_iniciado"] = False
 if "rodada_atual" not in st.session_state: st.session_state["rodada_atual"] = 1
 if "classificacao" not in st.session_state: st.session_state["classificacao"] = None
@@ -178,6 +180,7 @@ if "placares_rodada_atual" not in st.session_state: st.session_state["placares_r
 if "semente_reset" not in st.session_state: st.session_state["semente_reset"] = 1
 if "nome_torneio" not in st.session_state: st.session_state["nome_torneio"] = "Torneio de Truco"
 if "jogador_sendo_editado" not in st.session_state: st.session_state["jogador_sendo_editado"] = None
+if "entidade_sendo_editada" not in st.session_state: st.session_state["entidade_sendo_editada"] = None
 if "admin_logado" not in st.session_state: st.session_state["admin_logado"] = False
 
 # --- FUNÇÃO DE LIMPEZA DE MEMÓRIA ---
@@ -191,7 +194,9 @@ def limpar_placares_memoria():
 # --- PERSISTÊNCIA EM DISCO ---
 def salvar_estado_no_disco():
     estado = {
+        "entidades": st.session_state["entidades"],
         "jogadores": st.session_state["jogadores"],
+        "vinc_entidades": st.session_state["vinc_entidades"],
         "torneio_iniciado": st.session_state["torneio_iniciado"],
         "rodada_atual": st.session_state["rodada_atual"],
         "confrontos": st.session_state["confrontos"],
@@ -220,7 +225,9 @@ def carregar_estado_do_disco():
         try:
             with open(ARQUIVO_BACKUP, "r", encoding="utf-8") as f:
                 estado = json.load(f)
+            st.session_state["entidades"] = estado.get("entidades", [])
             st.session_state["jogadores"] = estado.get("jogadores", [])
+            st.session_state["vinc_entidades"] = estado.get("vinc_entidades", {})
             st.session_state["torneio_iniciado"] = estado.get("torneio_iniciado", False)
             st.session_state["rodada_atual"] = estado.get("rodada_atual", 1)
             st.session_state["confrontos"] = estado.get("confrontos", [])
@@ -244,12 +251,10 @@ carregar_estado_do_disco()
 
 # --- RECALCULADOR MATRIZ ---
 def reconstruir_classificacao_global():
-    # Cria a matriz indexada pela string de identificação completa "Nome (Entidade)"
-    nomes_indexados = [f"{j['nome']} ({j['entidade']})" for j in st.session_state["jogadores"]]
     st.session_state["classificacao"] = pd.DataFrame({
-        'Jogador & Entidade': nomes_indexados, 'Vitorias': 0, 'Sets_Ganhos': 0, 
+        'Jogador': st.session_state["jogadores"], 'Vitorias': 0, 'Sets_Ganhos': 0, 
         'Tentos_Pro': 0, 'Tentos_Contra': 0, 'Saldo_Tentos': 0, 'Flores': 0
-    }).set_index('Jogador & Entidade')
+    }).set_index('Jogador')
     
     for r_num, mesas in st.session_state["historico_rodadas"].items():
         for m_id, dados in mesas.items():
@@ -271,10 +276,8 @@ def reconstruir_classificacao_global():
 # --- LÓGICA DE GERAÇÃO DE CHAVES ---
 def gerar_rodada_web():
     limpar_placares_memoria()
-    lista_formatada = [f"{j['nome']} ({j['entidade']})" for j in st.session_state["jogadores"]]
-    
     if st.session_state["rodada_atual"] == 1:
-        lista_rodada = list(lista_formatada)
+        lista_rodada = list(st.session_state["jogadores"])
         random.shuffle(lista_rodada)
     else:
         df_ord = st.session_state["classificacao"].sort_values(by=['Vitorias', 'Sets_Ganhos', 'Saldo_Tentos'], ascending=False)
@@ -324,9 +327,9 @@ def disparar_atualizacao_placar(m_str, j1, j2):
     p_antigo = st.session_state["placares_rodada_atual"].get(m_str, [0, 0, 0, 0, 0, 0, False])
     
     if (s1 == 2 and s2 == 0):
-        t2, t1 = min(st.session_state.get(f"dir_t2_{m_str}_r{sem}_2x0j1", p_antigo[3]), 46), 72
+        t1, t2 = 72, min(st.session_state.get(f"dir_t2_{m_str}_r{sem}_2x0j1", p_antigo[3]), 46)
     elif (s2 == 2 and s1 == 0):
-        t1, t2 = min(st.session_state.get(f"dir_t1_{m_str}_r{sem}_2x0j2", p_antigo[2]), 46), 72
+        t2, t1 = 72, min(st.session_state.get(f"dir_t1_{m_str}_r{sem}_2x0j2", p_antigo[2]), 46)
     else:
         t1_raw = st.session_state.get(f"dir_t1_{m_str}_r{sem}_2x1", "")
         t2_raw = st.session_state.get(f"dir_t2_{m_str}_r{sem}_2x1", "")
@@ -352,42 +355,39 @@ def salvar_mudanca_retroativa(r_alvo, m_id, j1, j2):
 
 # --- CARDS DINÂMICOS DE MESA COM STATUS COLORIDO (PLANTA BAIXA PREMIUM) ---
 def desenhar_mesa_planta_baixa(j1, j2, mesa_num, s1, t1, f1, s2, t2, f2, tipo_jogo="normal"):
+    ent_j1 = st.session_state["vinc_entidades"].get(j1, "Sem Clube")
+    ent_j2 = st.session_state["vinc_entidades"].get(j2, "Sem Clube")
+    
     animacao_css = ""
     if tipo_jogo == "final":
         borda_cor = "#ffb703" 
         bg_topo = "linear-gradient(135deg, #ffb703, #b8860b)"
         texto_topo = "#000000"
         tag_titulo = "👑 GRANDE FINAL ABSOLUTA 👑"
-        card_height = "420px"
-        fonte_jogadores = "1.3rem"
+        card_height = "440px"
+        fonte_jogadores = "1.5rem"
         animacao_css = "animation: pulsarFinal 2s infinite ease-in-out;"
     elif tipo_jogo == "3place":
         borda_cor = "#cd7f32" 
         bg_topo = "linear-gradient(135deg, #cd7f32, #8b5a2b)"
         texto_topo = "#ffffff"
         tag_titulo = "🥉 DISPUTA DE 3º LUGAR 🥉"
-        card_height = "400px"
-        fonte_jogadores = "1.2rem"
+        card_height = "420px"
+        fonte_jogadores = "1.3rem"
     elif (s1 == 2 or s2 == 2):
         borda_cor = "#2b8a3e" 
         bg_topo = "#124027"
         texto_topo = "#ffffff"
         tag_titulo = f"🎰 MESA {mesa_num} (CONCLUÍDO)"
-        card_height = "350px"
+        card_height = "370px"
         fonte_jogadores = "1.1rem"
     else:
         borda_cor = "#e67e22" 
         bg_topo = "#2c1e11"
         texto_topo = "#ffffff"
         tag_titulo = f"🎰 MESA {mesa_num}"
-        card_height = "350px"
+        card_height = "370px"
         fonte_jogadores = "1.1rem"
-
-    # Quebra de segurança para exibir o nome e entidade em linhas organizadas nos blocos da planta baixa
-    j1_nome, j1_ent = j1.split(" (") if " (" in j1 else (j1, ")")
-    j2_nome, j2_ent = j2.split(" (") if " (" in j2 else (j2, ")")
-    j1_ent = j1_ent.replace(")", "")
-    j2_ent = j2_ent.replace(")", "")
 
     html_mesa = f"""
     <style>
@@ -400,15 +400,12 @@ def desenhar_mesa_planta_baixa(j1, j2, mesa_num, s1, t1, f1, s2, t2, f2, tipo_jo
     <div style="background: linear-gradient(135deg, #0f2d1b, #06170d); border: 4px solid {borda_cor}; border-radius: 20px; padding: 15px; display: flex; flex-direction: column; align-items: center; justify-content: space-between; position: relative; box-shadow: 0px 8px 16px rgba(0,0,0,0.5); height: {card_height}; box-sizing: border-box; color: #ffffff; font-family: system-ui, -apple-system, sans-serif; margin-bottom: 5px; {animacao_css}">
         
         <div style="text-align: center; width: 100%;">
-            <div style="font-size: 0.75rem; color: #69db7c; font-weight: bold; text-transform: uppercase;">🧔 Jogador 1</div>
-            <div style="background: #04120a; color: #ffffff; padding: 4px 12px; border-radius: 8px; display: inline-block; border: 1px solid #ffb703; width: 90%;">
-                <div style="font-size: {fonte_jogadores}; font-weight: 900; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{j1_nome}</div>
-                <div style="font-size: 0.75rem; color: #ffb703; font-weight: bold; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">🏢 {j1_ent}</div>
-            </div>
+            <div style="font-size: 0.75rem; color: #69db7c; font-weight: bold; text-transform: uppercase;">🧔 {ent_j1}</div>
+            <div style="background: #04120a; color: #ffffff; padding: 6px 15px; border-radius: 8px; font-size: {fonte_jogadores}; font-weight: 900; display: inline-block; border: 1px solid #ffb703; max-width: 85%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{j1}</div>
         </div>
         
-        <div style="background-color: #04120a; border: 2px solid {borda_cor}; border-radius: 12px; padding: 10px; width: 95%; text-align: center; box-shadow: inset 0 2px 5px rgba(0,0,0,0.6);">
-            <div style="background: {bg_topo}; color: {texto_topo}; font-size: 0.85rem; font-weight: 900; padding: 5px 0; border-radius: 6px; letter-spacing: 1px; text-transform: uppercase;">{tag_titulo}</div>
+        <div style="background-color: #04120a; border: 2px solid {borda_cor}; border-radius: 12px; padding: 10px; width: 90%; text-align: center; box-shadow: inset 0 2px 5px rgba(0,0,0,0.6);">
+            <div style="background: {bg_topo}; color: {texto_topo}; font-size: 0.9rem; font-weight: 900; padding: 5px 0; border-radius: 6px; letter-spacing: 1.5px; text-transform: uppercase;">{tag_titulo}</div>
             <div style="display: flex; justify-content: space-around; align-items: center; font-size: 2.2rem; font-weight: 900; margin-top: 8px;">
                 <div style="color: #ffb703;">{int(s1)}<span style="font-size:1.2rem; color:#69db7c;">s</span> {int(t1)}<span style="font-size:1.2rem; color:#69db7c;">t</span></div>
                 <div style="font-size: 1rem; color: #69db7c; font-weight: bold;">X</div>
@@ -420,11 +417,8 @@ def desenhar_mesa_planta_baixa(j1, j2, mesa_num, s1, t1, f1, s2, t2, f2, tipo_jo
         </div>
         
         <div style="text-align: center; width: 100%;">
-            <div style="background: #04120a; color: #ffffff; padding: 4px 12px; border-radius: 8px; display: inline-block; border: 1px solid #ffb703; width: 90%;">
-                <div style="font-size: {fonte_jogadores}; font-weight: 900; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{j2_nome}</div>
-                <div style="font-size: 0.75rem; color: #ffb703; font-weight: bold; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">🏢 {j2_ent}</div>
-            </div>
-            <div style="font-size: 0.75rem; color: #69db7c; font-weight: bold; text-transform: uppercase; margin-top: 2px;">🧔 Jogador 2</div>
+            <div style="background: #04120a; color: #ffffff; padding: 6px 15px; border-radius: 8px; font-size: {fonte_jogadores}; font-weight: 900; display: inline-block; border: 1px solid #ffb703; max-width: 85%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{j2}</div>
+            <div style="font-size: 0.75rem; color: #69db7c; font-weight: bold; text-transform: uppercase; margin-top: 2px;">🧔 {ent_j2}</div>
         </div>
     </div>
     """
@@ -436,14 +430,10 @@ def renderizar_formulario_mesa_admin(m, j1, j2, sem_id):
     s1, s2, t1, t2, f1, f2 = p[0], p[1], p[2], p[3], p[4], p[5]
     c1, c2 = st.columns([1, 1])
     
-    # Exibe rótulos compactados removendo a entidade na área de inputs dos sets para não poluir
-    j1_curto = j1.split(" (")[0]
-    j2_curto = j2.split(" (")[0]
-
     with c1:
         st.markdown(f"<h4 class='titulo-passo-admin'>• SETS (Passo 1)</h4>", unsafe_allow_html=True)
-        s1_in = st.number_input(f"Sets - {j1_curto}", 0, 2, int(s1), key=f"dir_s1_{m}_r{sem_id}", on_change=disparar_atualizacao_placar, args=(m, j1, j2))
-        s2_in = st.number_input(f"Sets - {j2_curto}", 0, 2, int(s2), key=f"dir_s2_{m}_r{sem_id}", on_change=disparar_atualizacao_placar, args=(m, j1, j2))
+        s1_in = st.number_input(f"Sets - {j1}", 0, 2, int(s1), key=f"dir_s1_{m}_r{sem_id}", on_change=disparar_atualizacao_placar, args=(m, j1, j2))
+        s2_in = st.number_input(f"Sets - {j2}", 0, 2, int(s2), key=f"dir_s2_{m}_r{sem_id}", on_change=disparar_atualizacao_placar, args=(m, j1, j2))
 
     jogo_encerrado = (s1_in == 2 or s2_in == 2)
     
@@ -453,18 +443,18 @@ def renderizar_formulario_mesa_admin(m, j1, j2, sem_id):
         else:
             st.markdown(f"<h4 class='titulo-passo-admin'>• TENTOS (Passo 2)</h4>", unsafe_allow_html=True)
             if s1_in == 2 and s2_in == 0:
-                st.number_input(f"Tentos - {j2_curto} (Máx: 46)", 0, 46, min(int(t2), 46), key=f"dir_t2_{m}_r{sem_id}_2x0j1", on_change=disparar_atualizacao_placar, args=(m, j1, j2))
+                st.number_input(f"Tentos - {j2} (Máx: 46)", 0, 46, min(int(t2), 46), key=f"dir_t2_{m}_r{sem_id}_2x0j1", on_change=disparar_atualizacao_placar, args=(m, j1, j2))
             elif s2_in == 2 and s1_in == 0:
-                st.number_input(f"Tentos - {j1_curto} (Máx: 46)", 0, 46, min(int(t1), 46), key=f"dir_t1_{m}_r{sem_id}_2x0j2", on_change=disparar_atualizacao_placar, args=(m, j1, j2))
+                st.number_input(f"Tentos - {j1} (Máx: 46)", 0, 46, min(int(t1), 46), key=f"dir_t1_{m}_r{sem_id}_2x0j2", on_change=disparar_atualizacao_placar, args=(m, j1, j2))
             else:
                 t1_val_str = "" if (t1 == 72 or t1 == 0) else str(t1)
                 t2_val_str = "" if (t2 == 72 or t2 == 0) else str(t2)
-                st.text_input(f"Tentos - {j1_curto}", value=t1_val_str, key=f"dir_t1_{m}_r{sem_id}_2x1", on_change=disparar_atualizacao_placar, args=(m, j1, j2), placeholder="Tentos...")
-                st.text_input(f"Tentos - {j2_curto}", value=t2_val_str, key=f"dir_t2_{m}_r{sem_id}_2x1", on_change=disparar_atualizacao_placar, args=(m, j1, j2), placeholder="Tentos...")
+                st.text_input(f"Tentos - {j1}", value=t1_val_str, key=f"dir_t1_{m}_r{sem_id}_2x1", on_change=disparar_atualizacao_placar, args=(m, j1, j2), placeholder="Tentos...")
+                st.text_input(f"Tentos - {j2}", value=t2_val_str, key=f"dir_t2_{m}_r{sem_id}_2x1", on_change=disparar_atualizacao_placar, args=(m, j1, j2), placeholder="Tentos...")
             
             st.markdown(f"<h4 class='titulo-passo-admin'>• FLORES (Passo 3)</h4>", unsafe_allow_html=True)
-            st.number_input(f"Flores - {j1_curto}", 0, 20, int(f1), key=f"dir_f1_{m}_r{sem_id}", on_change=disparar_atualizacao_placar, args=(m, j1, j2))
-            st.number_input(f"Flores - {j2_curto}", 0, 20, int(f2), key=f"dir_f2_{m}_r{sem_id}", on_change=disparar_atualizacao_placar, args=(m, j1, j2))
+            st.number_input(f"Flores - {j1}", 0, 20, int(f1), key=f"dir_f1_{m}_r{sem_id}", on_change=disparar_atualizacao_placar, args=(m, j1, j2))
+            st.number_input(f"Flores - {j2}", 0, 20, int(f2), key=f"dir_f2_{m}_r{sem_id}", on_change=disparar_atualizacao_placar, args=(m, j1, j2))
 
 # --- BARRA LATERAL PERSISTENTE ---
 with st.sidebar:
@@ -558,42 +548,117 @@ else:
 
     with aba_arena:
         if not st.session_state["torneio_iniciado"]:
-            st.markdown("### 🎮 Inscrições de Competidores")
+            st.markdown("### 🎮 Configurações e Inscrições")
             nome_t = st.text_input("Nome do Evento:", value="Torneio de Truco do CTG")
+            
+            # --- SEÇÃO INTEGRAMENTE RECOMPOSTA DE ENTIDADES ---
+            st.markdown("---")
+            st.markdown("### 🏢 Gestão de Entidades (Clubes / CTGs)")
+            
+            if is_admin:
+                if st.session_state.get("entidade_sendo_editada") is not None:
+                    idx_ent_edit = st.session_state["entidade_sendo_editada"]
+                    ent_antiga = st.session_state["entidades"][idx_ent_edit]
+                    with st.form("form_edicao_entidade"):
+                        novo_nome_ent = st.text_input("Corrigir Nome da Entidade:", value=ent_antiga)
+                        col_ent_b1, col_ent_b2 = st.columns(2)
+                        with col_ent_b1:
+                            if st.form_submit_button("💾 Salvar") and novo_nome_ent.strip():
+                                # Atualiza o mapeamento dos jogadores vinculados se mudar de nome
+                                velha_entidade = st.session_state["entidades"][idx_ent_edit]
+                                for j_k, e_v in list(st.session_state["vinc_entidades"].items()):
+                                    if e_v == velha_entidade:
+                                        st.session_state["vinc_entidades"][j_k] = novo_nome_ent.strip()
+                                st.session_state["entidades"][idx_ent_edit] = novo_nome_ent.strip()
+                                st.session_state["entidade_sendo_editada"] = None
+                                salvar_estado_no_disco(); st.rerun()
+                        with col_ent_b2:
+                            if st.form_submit_button("❌ Cancelar"): st.session_state["entidade_sendo_editada"] = None; st.rerun()
+                else:
+                    with st.form("cad_entidade", clear_on_submit=True):
+                        ne = st.text_input("Nome da Entidade:")
+                        if st.form_submit_button("➕ Cadastrar Entidade") and ne:
+                            if ne.strip() not in st.session_state["entidades"]:
+                                st.session_state["entidades"].append(ne.strip())
+                                salvar_estado_no_disco(); st.rerun()
+                            else:
+                                st.error("Entidade já cadastrada!")
+
+            st.write(f"**Entidades Registradas ({len(st.session_state['entidades'])}):**")
+            if st.session_state["entidades"]:
+                if is_admin:
+                    for idx, entidade in enumerate(st.session_state["entidades"]):
+                        c_ent_nome, c_ent_edit, c_ent_excluir = st.columns([70, 15, 15])
+                        with c_ent_nome: st.markdown(f"<p style='padding:8px; background-color:#12251a; border-radius:6px; font-weight:bold; border: 1px solid #69db7c;'>🏢 {entidade}</p>", unsafe_allow_html=True)
+                        with c_ent_edit:
+                            st.markdown('<div class="botao-editar">', unsafe_allow_html=True)
+                            if st.button("✏️", key=f"btn_ent_edit_{idx}"): st.session_state["entidade_sendo_editada"] = idx; st.rerun()
+                            st.markdown('</div>', unsafe_allow_html=True)
+                        with c_ent_excluir:
+                            st.markdown('<div class="botao-excluir">', unsafe_allow_html=True)
+                            if st.button("🗑️", key=f"btn_ent_del_{idx}"):
+                                removida = st.session_state["entidades"].pop(idx)
+                                # Limpa vínculos associados
+                                for j_k, e_v in list(st.session_state["vinc_entidades"].items()):
+                                    if e_v == removida:
+                                        del st.session_state["vinc_entidades"][j_k]
+                                salvar_estado_no_disco(); st.rerun()
+                            st.markdown('</div>', unsafe_allow_html=True)
+                else: st.info(", ".join(st.session_state["entidades"]))
+            else:
+                st.info("Nenhuma entidade cadastrada até o momento.")
+
+            # --- SEÇÃO DE COMPETIDORES ---
+            st.markdown("---")
+            st.markdown("### 🧔 Inscrições de Competidores")
             
             if is_admin:
                 if st.session_state.get("jogador_sendo_editado") is not None:
                     idx_edit = st.session_state["jogador_sendo_editado"]
-                    dados_antigos = st.session_state["jogadores"][idx_edit]
+                    nome_antigo = st.session_state["jogadores"][idx_edit]
+                    ent_atual = st.session_state["vinc_entidades"].get(nome_antigo, "Sem Clube")
+                    opcoes_ent = ["Sem Clube"] + st.session_state["entidades"]
+                    
                     with st.form("form_edicao"):
-                        novo_nome = st.text_input("Corrigir Nome:", value=dados_antigos["nome"])
-                        nova_ent = st.text_input("Corrigir Entidade / CTG:", value=dados_antigos["entidade"])
+                        novo_nome = st.text_input("Corrigir Nome:", value=nome_antigo)
+                        nova_ent = st.selectbox("Alterar Entidade:", opcoes_ent, index=opcoes_ent.index(ent_atual) if ent_atual in opcoes_ent else 0)
                         col_b1, col_b2 = st.columns(2)
                         with col_b1:
-                            if st.form_submit_button("💾 Salvar") and novo_nome.strip() and nova_ent.strip():
-                                st.session_state["jogadores"][idx_edit] = {"nome": novo_nome.strip(), "entidade": nova_ent.strip().upper()}
+                            if st.form_submit_button("💾 Salvar") and novo_nome.strip():
+                                old_name = st.session_state["jogadores"][idx_edit]
+                                if old_name in st.session_state["vinc_entidades"]:
+                                    del st.session_state["vinc_entidades"][old_name]
+                                
+                                st.session_state["jogadores"][idx_edit] = novo_nome.strip()
+                                if nova_ent != "Sem Clube":
+                                    st.session_state["vinc_entidades"][novo_nome.strip()] = nova_ent
                                 st.session_state["jogador_sendo_editado"] = None
                                 salvar_estado_no_disco(); st.rerun()
                         with col_b2:
                             if st.form_submit_button("❌ Cancelar"): st.session_state["jogador_sendo_editado"] = None; st.rerun()
                 else:
                     with st.form("cad", clear_on_submit=True):
-                        col_cad1, col_cad2 = st.columns(2)
-                        with col_cad1:
-                            nj = st.text_input("Nome do Competidor:")
-                        with col_cad2:
-                            ent_j = st.text_input("Entidade / CTG / Clube:", placeholder="Ex: CTG SENTINELA")
+                        nj = st.text_input("Nome do Competidor:")
+                        opcoes_entidades = ["Sem Clube"] + st.session_state["entidades"]
+                        ent_vinculo = st.selectbox("Vincular à Entidade:", opcoes_entidades)
                         
-                        if st.form_submit_button("➕ Cadastrar Competidor") and nj and ent_j:
-                            st.session_state["jogadores"].append({"nome": nj.strip(), "entidade": ent_j.strip().upper()})
-                            salvar_estado_no_disco(); st.rerun()
+                        if st.form_submit_button("➕ Cadastrar Competidor") and nj:
+                            nome_j_limpo = nj.strip()
+                            if nome_j_limpo not in st.session_state["jogadores"]:
+                                st.session_state["jogadores"].append(nome_j_limpo)
+                                if ent_vinculo != "Sem Clube":
+                                    st.session_state["vinc_entidades"][nome_j_limpo] = ent_vinculo
+                                salvar_estado_no_disco(); st.rerun()
+                            else:
+                                st.error("Este competidor já está cadastrado!")
                             
             st.write(f"**Competidores Registrados ({len(st.session_state['jogadores'])}):**")
             if st.session_state["jogadores"]:
                 if is_admin:
-                    for idx, j_dict in enumerate(st.session_state["jogadores"]):
+                    for idx, jogador in enumerate(st.session_state["jogadores"]):
                         c_nome, c_edit, c_excluir = st.columns([70, 15, 15])
-                        with c_nome: st.markdown(f"<p style='padding:8px; background-color:#0d301b; border-radius:6px; font-weight:bold; border: 1px solid #ffb703;'>🔹 {j_dict['nome']} <span style='color:#ffb703; float:right; font-size:0.85rem;'>🏢 {j_dict['entidade']}</span></p>", unsafe_allow_html=True)
+                        ent_pertencente = st.session_state["vinc_entidades"].get(jogador, "Sem Clube")
+                        with c_nome: st.markdown(f"<p style='padding:8px; background-color:#0d301b; border-radius:6px; font-weight:bold; border: 1px solid #ffb703;'>🔹 {jogador} <small style='color: #69db7c;'>({ent_pertencente})</small></p>", unsafe_allow_html=True)
                         with c_edit:
                             st.markdown('<div class="botao-editar">', unsafe_allow_html=True)
                             if st.button("✏️", key=f"btn_edit_{idx}"): st.session_state["jogador_sendo_editado"] = idx; st.rerun()
@@ -601,17 +666,20 @@ else:
                         with c_excluir:
                             st.markdown('<div class="botao-excluir">', unsafe_allow_html=True)
                             if st.button("🗑️", key=f"btn_del_{idx}"):
-                                st.session_state["jogadores"].pop(idx)
+                                nome_removido = st.session_state["jogadores"].pop(idx)
+                                if nome_removido in st.session_state["vinc_entidades"]:
+                                    del st.session_state["vinc_entidades"][nome_removido]
                                 salvar_estado_no_disco(); st.rerun()
                             st.markdown('</div>', unsafe_allow_html=True)
-                else: 
-                    st.info(", ".join([f"{j['nome']} ({j['entidade']})" for j in st.session_state["jogadores"]]))
+                else:
+                    render_list = [f"{j} ({st.session_state['vinc_entidades'].get(j, 'Sem Clube')})" for j in st.session_state["jogadores"]]
+                    st.info(", ".join(render_list))
                 
             if is_admin and len(st.session_state["jogadores"]) >= 4:
                 st.markdown("---")
                 if st.button("🃏 GERAR CHAVES E DISPARAR TORNEIO"):
                     st.session_state["nome_torneio"] = nome_t
-                    reconstruir_classificacao_global()
+                    st.session_state["classificacao"] = pd.DataFrame({'Jogador': st.session_state["jogadores"], 'Vitorias': 0, 'Sets_Ganhos': 0, 'Tentos_Pro': 0, 'Tentos_Contra': 0, 'Saldo_Tentos': 0, 'Flores': 0}).set_index('Jogador')
                     st.session_state["torneio_iniciado"] = True
                     gerar_rodada_web(); st.rerun()
         else:
@@ -784,7 +852,12 @@ else:
     with aba_tabela:
         if st.session_state["classificacao"] is not None:
             st.markdown("### 📊 Tabela Oficial de Pontuação")
-            df_r = st.session_state["classificacao"].sort_values(by=['Vitorias','Sets_Ganhos','Saldo_Tentos'], ascending=False)
+            df_r = st.session_state["classificacao"].sort_values(by=['Vitorias','Sets_Ganhos','Saldo_Tentos'], ascending=False).copy()
+            
+            # Adiciona coluna de Entidade na visualização da tabela para fins de auditoria completa
+            df_r['Entidade'] = [st.session_state["vinc_entidades"].get(j, "Sem Clube") for j in df_r.index]
+            # Reorganiza colunas colocando a entidade visível
+            df_r = df_r[['Entidade', 'Vitorias', 'Sets_Ganhos', 'Tentos_Pro', 'Tentos_Contra', 'Saldo_Tentos', 'Flores']]
             st.table(df_r)
             
             if st.session_state["historico_rodadas"]:
@@ -798,11 +871,11 @@ else:
                             if is_admin:
                                 c_e1, c_e2 = st.columns(2)
                                 with c_e1:
-                                    st.number_input(f"Sets ({dados['j1'].split(' (')[0]})", 0, 2, int(dados["s1"]), key=f"ret_s1_{r_sel}_{m_id}", on_change=salvar_mudanca_retroativa, args=(r_sel, m_id, dados['j1'], dados['j2']))
-                                    st.number_input(f"Tentos ({dados['j1'].split(' (')[0]})", 0, 72, int(dados["t1"]), key=f"ret_t1_{r_sel}_{m_id}", on_change=salvar_mudanca_retroativa, args=(r_sel, m_id, dados['j1'], dados['j2']))
+                                    st.number_input(f"Sets ({dados['j1']})", 0, 2, int(dados["s1"]), key=f"ret_s1_{r_sel}_{m_id}", on_change=salvar_mudanca_retroativa, args=(r_sel, m_id, dados['j1'], dados['j2']))
+                                    st.number_input(f"Tentos ({dados['j1']})", 0, 72, int(dados["t1"]), key=f"ret_t1_{r_sel}_{m_id}", on_change=salvar_mudanca_retroativa, args=(r_sel, m_id, dados['j1'], dados['j2']))
                                 with c_e2:
-                                    st.number_input(f"Sets ({dados['j2'].split(' (')[0]})", 0, 2, int(dados["s2"]), key=f"ret_s2_{r_sel}_{m_id}", on_change=salvar_mudanca_retroativa, args=(r_sel, m_id, dados['j1'], dados['j2']))
-                                    st.number_input(f"Tentos ({dados['j2'].split(' (')[0]})", 0, 72, int(dados["t2"]), key=f"ret_t2_{r_sel}_{m_id}", on_change=salvar_mudanca_retroativa, args=(r_sel, m_id, dados['j1'], dados['j2']))
+                                    st.number_input(f"Sets ({dados['j2']})", 0, 2, int(dados["s2"]), key=f"ret_s2_{r_sel}_{m_id}", on_change=salvar_mudanca_retroativa, args=(r_sel, m_id, dados['j1'], dados['j2']))
+                                    st.number_input(f"Tentos ({dados['j2']})", 0, 72, int(dados["t2"]), key=f"ret_t2_{r_sel}_{m_id}", on_change=salvar_mudanca_retroativa, args=(r_sel, m_id, dados['j1'], dados['j2']))
                             else: st.markdown(f"👉 **Placar Histórico:** {dados['s1']}s {dados['t1']}t VS {dados['s2']}s {dados['t2']}t")
 
     with aba_historico:
@@ -840,7 +913,7 @@ st.markdown("""
             🚀 Desenvolvido por: <span style="color: #ffb703; font-weight: 900; letter-spacing: 0.5px;">Eduardo Luis Ferreira</span>
         </div>
         <div style="color: #ffffff; font-size: 0.85rem; font-weight: bold; display: flex; gap: 15px; align-items: center; text-shadow: 1px 1px 2px #000;">
-            <span>📦 Versão: <span style="color: #ffb703; font-weight: 900;">2.6.5-Stable</span></span>
+            <span>📦 Versão: <span style="color: #ffb703; font-weight: 900;">2.6.0-Stable</span></span>
             <span style="color: #ffb703; font-weight: 900;">|</span>
             <span style="color: #69db7c; font-weight: 900; display: inline-flex; align-items: center; gap: 4px;">🟢 Sistema Online</span>
             <span style="color: #ffb703; font-weight: 900;">|</span>
