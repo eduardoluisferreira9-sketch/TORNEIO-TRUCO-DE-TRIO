@@ -655,34 +655,71 @@ else:
                 """
                 components.html(efeito_confete_html, height=1)
 
-                champ, vice = str(st.session_state["campeao"]), str(st.session_state["vice_campeao"])
+                champ = str(st.session_state["campeao"])
+                vice = str(st.session_state["vice_campeao"])
                 third = str(st.session_state["terceiro_lugar"]) if st.session_state["terceiro_lugar"] else "N/A"
                 fourth = str(st.session_state["quarto_lugar"]) if st.session_state["quarto_lugar"] else "N/A"
                 rei_flor_nome = str(st.session_state["classificacao"]['Flores'].idxmax())
                 rei_flor_val = int(st.session_state["classificacao"]['Flores'].max())
 
+                # --- IFRAME DO PÓDIO EXPANDIDO PARA 4 LUGARES ---
                 html_iframe_podio = f"""
                 <div style="background-color: transparent; padding: 10px; font-family: sans-serif; display: flex; flex-direction: column; gap: 20px; align-items: center; width: 100%; box-sizing: border-box;">
-                    <div style="display: flex; align-items: flex-end; justify-content: center; gap: 20px; width: 100%; max-width: 950px; margin: 20px auto;">
+                    <div style="display: flex; align-items: flex-end; justify-content: center; gap: 15px; width: 100%; max-width: 1100px; margin: 20px auto;">
+                        
                         <div style="flex: 1; background: linear-gradient(135deg, #ffffff, #b0b0b0); height: 210px; border-radius: 12px; text-align: center; padding: 20px 10px; box-shadow: 0px 15px 35px rgba(0,0,0,0.5); border: 2px solid #e0e0e0;">
                             <p style="font-size: 3.2rem; font-weight: 900; margin: 0; color: #111111;">2º</p>
-                            <div style="font-size: 1.4rem; font-weight: 900; text-transform: uppercase; color: #0b0f19;">👤 {vice}</div>
-                            <div style="font-size: 0.8rem; font-weight: bold; text-transform: uppercase; color: #333333;">🥈 Vice-Campeão</div>
+                            <div style="font-size: 1.3rem; font-weight: 900; text-transform: uppercase; color: #0b0f19; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">👤 {vice}</div>
+                            <div style="font-size: 0.8rem; font-weight: bold; text-transform: uppercase; color: #333333; margin-top: 5px;">🥈 Vice-Campeão</div>
                         </div>
-                        <div style="flex: 1; background: linear-gradient(135deg, #ffe066, #ffb703); height: 270px; border-radius: 12px; text-align: center; padding: 25px 10px; border: 3px solid #ffffff; box-shadow: 0px 0px 30px rgba(255, 183, 3, 0.6);">
-                            <p style="font-size: 3.5rem; font-weight: 900; margin: 0; color: #000000;">1º</p>
-                            <div style="font-size: 1.6rem; font-weight: 900; text-transform: uppercase; color: #0b0f19;">👑 {champ}</div>
-                            <div style="font-size: 0.8rem; font-weight: bold; text-transform: uppercase; color: #403000;">Campeão Absoluto</div>
+                        
+                        <div style="flex: 1.2; background: linear-gradient(135deg, #ffe066, #ffb703); height: 270px; border-radius: 12px; text-align: center; padding: 25px 10px; border: 3px solid #ffffff; box-shadow: 0px 0px 30px rgba(255, 183, 3, 0.6);">
+                            <p style="font-size: 3.8rem; font-weight: 900; margin: 0; color: #000000;">1º</p>
+                            <div style="font-size: 1.5rem; font-weight: 900; text-transform: uppercase; color: #0b0f19; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">👑 {champ}</div>
+                            <div style="font-size: 0.8rem; font-weight: bold; text-transform: uppercase; color: #403000; margin-top: 5px;">Campeão Absoluto</div>
                         </div>
-                        <div style="flex: 1; background: linear-gradient(135deg, #e69d5e, #cd7f32); height: 170px; border-radius: 12px; text-align: center; padding: 15px 10px; box-shadow: 0px 15px 35px rgba(0,0,0,0.5); border: 2px solid #cd7f32;">
+                        
+                        <div style="flex: 1; background: linear-gradient(135deg, #e69d5e, #cd7f32); height: 180px; border-radius: 12px; text-align: center; padding: 15px 10px; box-shadow: 0px 15px 35px rgba(0,0,0,0.5); border: 2px solid #cd7f32;">
                             <p style="font-size: 2.8rem; font-weight: 900; margin: 0; color: #ffffff;">3º</p>
-                            <div style="font-size: 1.3rem; font-weight: 900; text-transform: uppercase; color: #ffffff;">👤 {third}</div>
-                            <div style="font-size: 0.8rem; font-weight: bold; text-transform: uppercase; color: #f0f0f0;">🥉 3º Colocado</div>
+                            <div style="font-size: 1.2rem; font-weight: 900; text-transform: uppercase; color: #ffffff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">👤 {third}</div>
+                            <div style="font-size: 0.8rem; font-weight: bold; text-transform: uppercase; color: #f0f0f0; margin-top: 5px;">🥉 3º Colocado</div>
                         </div>
+
+                        <div style="flex: 0.9; background: linear-gradient(135deg, #2a4d38, #112419); height: 150px; border-radius: 12px; text-align: center; padding: 12px 10px; box-shadow: 0px 15px 35px rgba(0,0,0,0.5); border: 2px solid #69db7c;">
+                            <p style="font-size: 2.3rem; font-weight: 900; margin: 0; color: #69db7c;">4º</p>
+                            <div style="font-size: 1.1rem; font-weight: 900; text-transform: uppercase; color: #ffffff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">👤 {fourth}</div>
+                            <div style="font-size: 0.75rem; font-weight: bold; text-transform: uppercase; color: #69db7c; margin-top: 5px;">🏅 Medalha de Honra</div>
+                        </div>
+
                     </div>
                 </div>
                 """
                 components.html(html_iframe_podio, height=350)
+                
+                # --- DESTAQUE EXCLUSIVO: MAIOR CANTADOR DE FLOR DO TORNEIO ---
+                st.markdown("""
+                    <div style="
+                        background: linear-gradient(135deg, #2b0c1e, #14030d); 
+                        border: 3px solid #ff69b4; 
+                        border-radius: 15px; 
+                        padding: 20px; 
+                        text-align: center; 
+                        max-width: 600px; 
+                        margin: 20px auto; 
+                        box-shadow: 0px 0px 20px rgba(255, 105, 180, 0.4);
+                    ">
+                        <span style="font-size: 2.2rem;">🌸</span>
+                        <h2 style="color: #ff69b4 !important; margin: 5px 0; font-weight: 900; text-transform: uppercase; letter-spacing: 1px;">
+                            Maior Cantador de Flor
+                        </h2>
+                        <div style="font-size: 1.6rem; color: #ffffff; font-weight: bold; text-transform: uppercase; margin: 10px 0;">
+                            {trio_flor}
+                        </div>
+                        <div style="font-size: 1.1rem; color: #ff69b4; font-weight: bold; letter-spacing: 0.5px;">
+                            Totalizado com Incríveis <span style="font-size: 1.4rem; color: #ffffff; font-weight: 900;">{flores_total}</span> Flores Cantadas!
+                        </div>
+                    </div>
+                """.format(trio_flor=rei_flor_nome, flores_total=rei_flor_val), unsafe_allow_html=True)
                 
                 if is_admin and st.button("💾 Imortalizar Resultados na Galeria Histórica"):
                     novo_registro = {"Data": datetime.now().strftime("%d/%m/%Y"), "Torneio": st.session_state.get("nome_torneio", "Torneio de Truco"), "Campeao": champ, "Vice": vice, "Terceiro": third, "Quarto": fourth, "ReiDaFlor": f"{rei_flor_nome} ({rei_flor_val} fl.)"}
@@ -748,12 +785,10 @@ else:
                                 if st.session_state["rodada_atual"] <= 5: 
                                     gerar_rodada_web()
                                 else:
-                                    n_in = len(st.session_state["jogadores"])
-                                    f_n = "OITAVAS DE FINAL" if n_in > 16 else ("QUARTAS DE FINAL" if n_in >= 8 else "SEMIFINAL")
+                                    # 🚨 FIXO: Classificam estritamente os 4 melhores do torneio para a Semifinal
+                                    f_n = "SEMIFINAL"
                                     dv = st.session_state["classificacao"].sort_values(by=['Vitorias','Sets_Ganhos','Saldo_Tentos'], ascending=False)
-                                    
-                                    qtd_passam = 16 if n_in > 16 else (8 if n_in >= 8 else 4)
-                                    iniciar_fase_matamata(list(dv.index[:qtd_passam]), f_n)
+                                    iniciar_fase_matamata(list(dv.index[:4]), f_n)
                                 
                                 # Altera rigorosamente a semente de reset ao mudar de rodada ou avançar para playoffs
                                 st.session_state["semente_reset"] = st.session_state.get("semente_reset", 1) + 1
@@ -787,9 +822,7 @@ else:
                                     elif c["tipo"]=="final": st.session_state["campeao"]=w; st.session_state["vice_campeao"]=l
                                     elif c["tipo"]=="3place": st.session_state["terceiro_lugar"]=w; st.session_state["quarto_lugar"]=l
                                 f_at = st.session_state["fase_matamata"]
-                                if f_at == "OITAVAS DE FINAL": iniciar_fase_matamata(venc, "QUARTAS DE FINAL")
-                                elif f_at == "QUARTAS DE FINAL": iniciar_fase_matamata(venc, "SEMIFINAL")
-                                elif f_at == "SEMIFINAL":
+                                if f_at == "SEMIFINAL":
                                     limpar_placares_memoria()
                                     st.session_state["fase_matamata"] = "FINAL E TERCEIRO"
                                     st.session_state["confrontos_mm"] = [{"id_original": "1", "tipo": "final", "j1": venc[0], "j2": venc[1]}, {"id_original": "2", "tipo": "3place", "j1": perd[0], "j2": perd[1]}]
@@ -836,7 +869,7 @@ else:
                     st.markdown(f"""
                         <div style="background: linear-gradient(135deg, #0d301b, #04120a); border: 2px solid #ffb703; border-radius: 12px; padding: 15px; margin-bottom: 15px;">
                             <b style="color:#ffb703;">🏆 {reg.get('Torneio')}</b> <span style="float:right; color:#69db7c;">📅 {reg.get('Data')}</span><br>
-                            <span style="color:#ffffff;">🥇 Campeão: {reg.get('Campeao')} | 🥈 Vice: {reg.get('Vice')}</span><br>
+                            <span style="color:#ffffff;">🥇 Campeão: {reg.get('Campeao')} | 🥈 Vice: {reg.get('Vice')} | 🥉 3º: {reg.get('Terceiro')} | 🏅 4º: {reg.get('Quarto')}</span><br>
                             <span style="color:#ff69b4; font-weight:bold;">🌸 Maior Cantador de Flor: {reg.get('ReiDaFlor')}</span>
                         </div>
                     """, unsafe_allow_html=True)
@@ -862,7 +895,7 @@ st.markdown("""
             🚀 Desenvolvido por: <span style="color: #ffb703; font-weight: 900; letter-spacing: 0.5px;">Eduardo Luis Ferreira</span>
         </div>
         <div style="color: #ffffff; font-size: 0.85rem; font-weight: bold; display: flex; gap: 15px; align-items: center; text-shadow: 1px 1px 2px #000;">
-            <span>📦 Versão: <span style="color: #ffb703; font-weight: 900;">2.6.3-Stable</span></span>
+            <span>📦 Versão: <span style="color: #ffb703; font-weight: 900;">2.7.0-Stable</span></span>
             <span style="color: #ffb703; font-weight: 900;">|</span>
             <span style="color: #69db7c; font-weight: 900; display: inline-flex; align-items: center; gap: 4px;">🟢 Sistema Online</span>
             <span style="color: #ffb703; font-weight: 900;">|</span>
