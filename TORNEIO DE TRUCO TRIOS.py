@@ -190,7 +190,7 @@ def limpar_placares_memoria():
     for k in chaves_para_remover:
         del st.session_state[k]
 
-# --- PERSISTÊNCIA EM DISCO ---
+# --- PERSISTÊNCIA EM DISCO REATIVA ---
 def salvar_estado_no_disco():
     estado = {
         "jogadores": st.session_state["jogadores"],
@@ -376,14 +376,14 @@ def desenhar_mesa_planta_baixa(j1, j2, mesa_num, s1, t1, f1, s2, t2, f2, status_
         card_height = "420px"
         fonte_jogadores = "1.3rem"
     elif status_concluido:
-        borda_cor = "#2b8a3e" # Verde Metálico
+        borda_cor = "#2b8a3e" # Borda Verde Metálica para Concluído
         bg_topo = "#124027"
         texto_topo = "#ffffff"
         tag_titulo = f"🎰 MESA {mesa_num} (CONCLUÍDO)"
         card_height = "370px"
         fonte_jogadores = "1.1rem"
     else:
-        borda_cor = "#e67e22" # Laranja Alerta Pulsante
+        borda_cor = "#e67e22" # Borda Laranja Alerta Pulsante para Em Andamento
         bg_topo = "#2c1e11"
         texto_topo = "#ffffff"
         tag_titulo = f"🎰 MESA {mesa_num} (EM ANDAMENTO)"
