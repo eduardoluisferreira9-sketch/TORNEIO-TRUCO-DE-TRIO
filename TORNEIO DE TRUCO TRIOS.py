@@ -341,7 +341,7 @@ def salvar_mudanca_retroativa(r_alvo, m_id, j1, j2):
     st.session_state["historico_rodadas"][r_alvo][m_id]["f2"] = st.session_state.get(f"ret_f2_{r_alvo}_{m_id}", 0)
     reconstruir_classificacao_global()
 
-# --- CARDS MESA REDONDA PREMIUM COM POSICIONAMENTO FRENTE A FRENTE ---
+# --- CARDS MESA REDONDA PREMIUM COM POSICIONAMENTO INTERCALADO REAL ---
 def desenhar_mesa_planta_baixa(j1, j2, mesa_num, s1, t1, f1, s2, t2, f2, tipo_jogo="normal"):
     animacao_css = ""
     if tipo_jogo == "final":
@@ -362,7 +362,6 @@ def desenhar_mesa_planta_baixa(j1, j2, mesa_num, s1, t1, f1, s2, t2, f2, tipo_jo
         bg_centro = "radial-gradient(circle, #164e2f 0%, #061c10 100%)"
         tag_titulo = f"MESA {mesa_num}"
 
-    # Encurta strings longas para preservar integridade do design redondo
     j1_curto = j1[:12] + "..." if len(j1) > 12 else j1
     j2_curto = j2[:12] + "..." if len(j2) > 12 else j2
 
@@ -416,20 +415,20 @@ def desenhar_mesa_planta_baixa(j1, j2, mesa_num, s1, t1, f1, s2, t2, f2, tipo_jo
         
         <div class="assento" style="top: 80px; right: 10px;">
             <div class="nome-trio">{j1_curto}</div>
-            <div class="sub-pos cor-trio1">TA - JOGADOR 2</div>
+            <div class="sub-pos cor-trio1">TA - JOGADOR 3</div>
         </div>
         <div class="assento" style="bottom: 80px; left: 10px;">
             <div class="nome-trio">{j2_curto}</div>
-            <div class="sub-pos cor-trio2">TB - JOGADOR 2</div>
+            <div class="sub-pos cor-trio2">TB - JOGADOR 3</div>
         </div>
         
         <div class="assento" style="top: 80px; left: 10px;">
             <div class="nome-trio">{j1_curto}</div>
-            <div class="sub-pos cor-trio1">TA - JOGADOR 3</div>
+            <div class="sub-pos cor-trio1">TA - JOGADOR 2</div>
         </div>
         <div class="assento" style="bottom: 80px; right: 10px;">
             <div class="nome-trio">{j2_curto}</div>
-            <div class="sub-pos cor-trio2">TB - JOGADOR 3</div>
+            <div class="sub-pos cor-trio2">TB - JOGADOR 2</div>
         </div>
 
         <div style="
@@ -884,7 +883,7 @@ st.markdown("""
             🚀 Desenvolvido por: <span style="color: #ffb703; font-weight: 900; letter-spacing: 0.5px;">Eduardo Luis Ferreira</span>
         </div>
         <div style="color: #ffffff; font-size: 0.85rem; font-weight: bold; display: flex; gap: 15px; align-items: center; text-shadow: 1px 1px 2px #000;">
-            <span>📦 Versão: <span style="color: #ffb703; font-weight: 900;">3.6.0-Trios_Redondo_FaceToFace</span></span>
+            <span>📦 Versão: <span style="color: #ffb703; font-weight: 900;">3.7.0-Trios_Mesa_Misturada</span></span>
             <span style="color: #ffb703; font-weight: 900;">|</span>
             <span style="color: #69db7c; font-weight: 900; display: inline-flex; align-items: center; gap: 4px;">🟢 Central de Trios Online</span>
             <span style="color: #ffb703; font-weight: 900;">|</span>
