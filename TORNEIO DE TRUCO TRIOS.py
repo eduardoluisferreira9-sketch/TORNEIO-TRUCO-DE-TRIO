@@ -167,12 +167,10 @@ if "nome_torneio" not in st.session_state: st.session_state["nome_torneio"] = "T
 if "trio_sendo_editado" not in st.session_state: st.session_state["trio_sendo_editado"] = None
 if "admin_logado" not in st.session_state: st.session_state["admin_logado"] = False
 
-# Helper para formatar rótulo unificado: Nome do Trio (Entidade)
 def obter_label_trio(trio_dict):
     if not trio_dict: return ""
     return f"{trio_dict['nome']} ({trio_dict['entidade']})"
 
-# --- FUNÇÃO DE LIMPEZA DE MEMÓRIA ---
 def limpar_placares_memoria():
     st.session_state["placares_rodada_atual"] = {}
     st.session_state["semente_reset"] = st.session_state.get("semente_reset", 1) + 1
@@ -234,7 +232,6 @@ def carregar_estado_do_disco():
 
 carregar_estado_do_disco()
 
-# --- RECALCULADOR MATRIZ VINCULADO AO TRIO ---
 def reconstruir_classificacao_global():
     labels_trios = [obter_label_trio(t) for t in st.session_state["trios_dados"]]
     st.session_state["classificacao"] = pd.DataFrame({
@@ -259,7 +256,6 @@ def reconstruir_classificacao_global():
     st.session_state["classificacao"]['Saldo_Tentos'] = st.session_state["classificacao"]['Tentos_Pro'] - st.session_state["classificacao"]['Tentos_Contra']
     salvar_estado_no_disco()
 
-# --- LÓGICA DE GERAÇÃO DE CHAVES ---
 def gerar_rodada_web():
     limpar_placares_memoria()
     labels_trios = [obter_label_trio(t) for t in st.session_state["trios_dados"]]
@@ -307,7 +303,6 @@ def iniciar_fase_matamata(lista_trios, nome_fase):
     st.session_state["cronometro_ativo"] = False
     salvar_estado_no_disco()
 
-# --- DISPARADOR DE ATUALIZAÇÃO ---
 def disparar_atualizacao_placar(m_str, j1, j2):
     sem = st.session_state.get("semente_reset", 1)
     s1 = st.session_state.get(f"dir_s1_{m_str}_r{sem}", 0)
@@ -341,7 +336,7 @@ def salvar_mudanca_retroativa(r_alvo, m_id, j1, j2):
     st.session_state["historico_rodadas"][r_alvo][m_id]["f2"] = st.session_state.get(f"ret_f2_{r_alvo}_{m_id}", 0)
     reconstruir_classificacao_global()
 
-# --- CARDS MESA REDONDA PREMIUM COM POSICIONAMENTO INTERCALADO REAL ---
+# --- CARDS MESA COM DISTRIBUIÇÃO IDENTICA À DO DESENHO ENVIADO ---
 def desenhar_mesa_planta_baixa(j1, j2, mesa_num, s1, t1, f1, s2, t2, f2, tipo_jogo="normal"):
     animacao_css = ""
     if tipo_jogo == "final":
@@ -414,21 +409,21 @@ def desenhar_mesa_planta_baixa(j1, j2, mesa_num, s1, t1, f1, s2, t2, f2, tipo_jo
         </div>
         
         <div class="assento" style="top: 80px; right: 10px;">
-            <div class="nome-trio">{j1_curto}</div>
-            <div class="sub-pos cor-trio1">TA - JOGADOR 3</div>
+            <div class="nome-trio">{j2_curto}</div>
+            <div class="sub-pos cor-trio2">TB - JOGADOR 2</div>
         </div>
         <div class="assento" style="bottom: 80px; left: 10px;">
-            <div class="nome-trio">{j2_curto}</div>
-            <div class="sub-pos cor-trio2">TB - JOGADOR 3</div>
-        </div>
-        
-        <div class="assento" style="top: 80px; left: 10px;">
             <div class="nome-trio">{j1_curto}</div>
             <div class="sub-pos cor-trio1">TA - JOGADOR 2</div>
         </div>
+        
         <div class="assento" style="bottom: 80px; right: 10px;">
+            <div class="nome-trio">{j1_curto}</div>
+            <div class="sub-pos cor-trio1">TA - JOGADOR 3</div>
+        </div>
+        <div class="assento" style="top: 80px; left: 10px;">
             <div class="nome-trio">{j2_curto}</div>
-            <div class="sub-pos cor-trio2">TB - JOGADOR 2</div>
+            <div class="sub-pos cor-trio2">TB - JOGADOR 3</div>
         </div>
 
         <div style="
@@ -474,7 +469,7 @@ def desenhar_mesa_planta_baixa(j1, j2, mesa_num, s1, t1, f1, s2, t2, f2, tipo_jo
     """
     components.html(html_mesa, height=435, scrolling=False)
 
-# --- CONFIGURAÇÃO DO FORMULÁRIO DO PAINEL DE CONTROLE DE ENTRADAS ---
+# --- RECORTE DO SEU FORMULÁRIO DE CAPTURA ---
 def renderizar_formulario_mesa_admin(m, j1, j2, sem_id):
     p = st.session_state["placares_rodada_atual"].get(m, [0,0,0,0,0,0,False])
     s1, s2, t1, t2, f1, f2 = p[0], p[1], p[2], p[3], p[4], p[5]
@@ -506,7 +501,7 @@ def renderizar_formulario_mesa_admin(m, j1, j2, sem_id):
             st.number_input(f"Flores Trio 1", 0, 20, int(f1), key=f"dir_f1_{m}_r{sem_id}", on_change=disparar_atualizacao_placar, args=(m, j1, j2))
             st.number_input(f"Flores Trio 2", 0, 20, int(f2), key=f"dir_f2_{m}_r{sem_id}", on_change=disparar_atualizacao_placar, args=(m, j1, j2))
 
-# --- BARRA LATERAL PERSISTENTE ---
+# --- BARRA LATERAL ---
 with st.sidebar:
     st.markdown("## ⚙️ Painel do Diretor")
     if not st.session_state["admin_logado"]:
@@ -538,7 +533,7 @@ with st.sidebar:
             if os.path.exists(ARQUIVO_BACKUP): os.remove(ARQUIVO_BACKUP)
             st.session_state.clear(); st.rerun()
 
-# --- INTERFACE PRINCIPAL ---
+# --- RENDERS PRINCIPAIS ---
 st.markdown(f"<h1 style='text-align:center; color:#ffb703; font-weight:900; margin-top:0;'>🃏 {st.session_state.get('nome_torneio', 'Torneio de Truco em Trios')}</h1>", unsafe_allow_html=True)
 
 modo_exibicao = st.radio("Selecione o Modo de Visualização da Tela:", ["Arena de Gerenciamento", "🖥️ MODO TELÃO DE PROJETOR (Automático)"], horizontal=True)
@@ -729,13 +724,6 @@ else:
                     with open(ARQUIVO_GALERIA, "w", encoding="utf-8") as f: json.dump(lista_g, f, ensure_ascii=False, indent=4)
                     st.success("Resultados imortalizados com sucesso!")
             else:
-                if st.session_state["cronometro_ativo"] and st.session_state["hora_inicio_rodada"]:
-                    tl = st.session_state["hora_inicio_rodada"] + timedelta(minutes=45)
-                    tr = tl - datetime.now()
-                    if tr.total_seconds() > 0:
-                        st.markdown(f'<div class="cronometro-box-gigante"><div class="cronometro-tempo">{int(tr.total_seconds()//60):02d}:{int(tr.total_seconds()%60):02d}</div></div>', unsafe_allow_html=True)
-                    else: st.markdown('<div class="cronometro-box-gigante" style="border-color:#ff3232;"><div class="cronometro-tempo" style="color:#ff3232 !important;">⏰ TIMEOUT!</div></div>', unsafe_allow_html=True)
-
                 sem_id = st.session_state.get("semente_reset", 1)
 
                 if not st.session_state["em_matamata"]:
@@ -883,7 +871,7 @@ st.markdown("""
             🚀 Desenvolvido por: <span style="color: #ffb703; font-weight: 900; letter-spacing: 0.5px;">Eduardo Luis Ferreira</span>
         </div>
         <div style="color: #ffffff; font-size: 0.85rem; font-weight: bold; display: flex; gap: 15px; align-items: center; text-shadow: 1px 1px 2px #000;">
-            <span>📦 Versão: <span style="color: #ffb703; font-weight: 900;">3.7.0-Trios_Mesa_Misturada</span></span>
+            <span>📦 Versão: <span style="color: #ffb703; font-weight: 900;">3.7.2-Layout_Oficial_Intercalado</span></span>
             <span style="color: #ffb703; font-weight: 900;">|</span>
             <span style="color: #69db7c; font-weight: 900; display: inline-flex; align-items: center; gap: 4px;">🟢 Central de Trios Online</span>
             <span style="color: #ffb703; font-weight: 900;">|</span>
