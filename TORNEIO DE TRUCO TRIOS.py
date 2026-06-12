@@ -304,6 +304,9 @@ def iniciar_fase_matamata(lista_jogadores, nome_fase):
     st.session_state["fase_matamata"] = nome_fase
     st.session_state["confrontos_mm"] = []
     
+    # Força o reset completo dos IDs de componentes do Streamlit para evitar travamento
+    st.session_state["semente_reset"] = st.session_state.get("semente_reset", 1) + 1
+    
     if nome_fase == "FINAL E TERCEIRO": return 
 
     n = len(lista_jogadores)
@@ -548,7 +551,7 @@ else:
             st.markdown("### 🎮 Configurações e Inscrições")
             nome_t = st.text_input("Nome do Evento:", value="Torneio de Truco do CTG")
             
-            # --- ÁREA DE CADASTRO LIMPA E DIRETA (COMO SOLICITADO) ---
+            # --- ÁREA DE CADASTRO LIMPA E DIRETA ---
             st.markdown("---")
             st.markdown("### 🧔 Cadastro de Trios")
             
@@ -742,15 +745,21 @@ else:
                                         m_c += 1
                                 reconstruir_classificacao_global()
                                 st.session_state["rodada_atual"] += 1
-                                if st.session_state["rodada_atual"] <= 5: gerar_rodada_web()
+                                if st.session_state["rodada_atual"] <= 5: 
+                                    gerar_rodada_web()
                                 else:
                                     n_in = len(st.session_state["jogadores"])
                                     f_n = "OITAVAS DE FINAL" if n_in > 16 else ("QUARTAS DE FINAL" if n_in >= 8 else "SEMIFINAL")
                                     dv = st.session_state["classificacao"].sort_values(by=['Vitorias','Sets_Ganhos','Saldo_Tentos'], ascending=False)
-                                    iniciar_fase_matamata(list(dv.index[:16 if n_in>16 else (8 if n_in>=8 else 4)]), f_n)
+                                    
+                                    qtd_passam = 16 if n_in > 16 else (8 if n_in >= 8 else 4)
+                                    iniciar_fase_matamata(list(dv.index[:qtd_passam]), f_n)
+                                
+                                # Altera rigorosamente a semente de reset ao mudar de rodada ou avançar para playoffs
+                                st.session_state["semente_reset"] = st.session_state.get("semente_reset", 1) + 1
                                 st.rerun()
                 else:
-                    st.markdown(f"### ⚡ Eliminatórias Directas: {st.session_state['fase_matamata']}")
+                    st.markdown(f"### ⚡ Eliminatórias Diretas: {st.session_state['fase_matamata']}")
                     for c in st.session_state["confrontos_mm"]:
                         m = c["id_original"]; j1, j2 = c["j1"], c["j2"]
                         p = st.session_state["placares_rodada_atual"].get(m, [0,0,0,0,0,0,False])
@@ -785,6 +794,9 @@ else:
                                     st.session_state["fase_matamata"] = "FINAL E TERCEIRO"
                                     st.session_state["confrontos_mm"] = [{"id_original": "1", "tipo": "final", "j1": venc[0], "j2": venc[1]}, {"id_original": "2", "tipo": "3place", "j1": perd[0], "j2": perd[1]}]
                                     st.session_state["placares_rodada_atual"] = {"1": [0,0,0,0,0,0,False], "2": [0,0,0,0,0,0,False]}
+                                
+                                # Atualiza a semente também no avanço do mata-mata
+                                st.session_state["semente_reset"] = st.session_state.get("semente_reset", 1) + 1
                                 salvar_estado_no_disco(); st.rerun()
 
     with aba_tabela:
@@ -850,7 +862,7 @@ st.markdown("""
             🚀 Desenvolvido por: <span style="color: #ffb703; font-weight: 900; letter-spacing: 0.5px;">Eduardo Luis Ferreira</span>
         </div>
         <div style="color: #ffffff; font-size: 0.85rem; font-weight: bold; display: flex; gap: 15px; align-items: center; text-shadow: 1px 1px 2px #000;">
-            <span>📦 Versão: <span style="color: #ffb703; font-weight: 900;">2.6.2-Stable</span></span>
+            <span>📦 Versão: <span style="color: #ffb703; font-weight: 900;">2.6.3-Stable</span></span>
             <span style="color: #ffb703; font-weight: 900;">|</span>
             <span style="color: #69db7c; font-weight: 900; display: inline-flex; align-items: center; gap: 4px;">🟢 Sistema Online</span>
             <span style="color: #ffb703; font-weight: 900;">|</span>
