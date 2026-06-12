@@ -145,7 +145,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- CONFIGURAÇÃO INICIAL DOS ATRIBUTOS DE SESSÃO MUDADOS PARA TRIOS ---
-if "trios" not in st.session_state: st.session_state["trios"] = []
+if "trios_dados" not in st.session_state: st.session_state["trios_dados"] = []  # Armazena dicts: {"nome": X, "entidade": Y}
 if "torneio_iniciado" not in st.session_state: st.session_state["torneio_iniciado"] = False
 if "rodada_atual" not in st.session_state: st.session_state["rodada_atual"] = 1
 if "classificacao" not in st.session_state: st.session_state["classificacao"] = None
@@ -167,6 +167,11 @@ if "nome_torneio" not in st.session_state: st.session_state["nome_torneio"] = "T
 if "trio_sendo_editado" not in st.session_state: st.session_state["trio_sendo_editado"] = None
 if "admin_logado" not in st.session_state: st.session_state["admin_logado"] = False
 
+# Helper para formatar rótulo unificado: Nome do Trio (Entidade)
+def obter_label_trio(trio_dict):
+    if not trio_dict: return ""
+    return f"{trio_dict['nome']} ({trio_dict['entidade']})"
+
 # --- FUNÇÃO DE LIMPEZA DE MEMÓRIA ---
 def limpar_placares_memoria():
     st.session_state["placares_rodada_atual"] = {}
@@ -178,7 +183,7 @@ def limpar_placares_memoria():
 # --- PERSISTÊNCIA EM DISCO ---
 def salvar_estado_no_disco():
     estado = {
-        "trios": st.session_state["trios"],
+        "trios_dados": st.session_state["trios_dados"],
         "torneio_iniciado": st.session_state["torneio_iniciado"],
         "rodada_atual": st.session_state["rodada_atual"],
         "confrontos": st.session_state["confrontos"],
@@ -207,7 +212,7 @@ def carregar_estado_do_disco():
         try:
             with open(ARQUIVO_BACKUP, "r", encoding="utf-8") as f:
                 estado = json.load(f)
-            st.session_state["trios"] = estado.get("trios", [])
+            st.session_state["trios_dados"] = estado.get("trios_dados", [])
             st.session_state["torneio_iniciado"] = estado.get("torneio_iniciado", False)
             st.session_state["rodada_atual"] = estado.get("rodada_atual", 1)
             st.session_state["confrontos"] = estado.get("confrontos", [])
@@ -231,10 +236,11 @@ carregar_estado_do_disco()
 
 # --- RECALCULADOR MATRIZ VINCULADO AO TRIO ---
 def reconstruir_classificacao_global():
+    labels_trios = [obter_label_trio(t) for t in st.session_state["trios_dados"]]
     st.session_state["classificacao"] = pd.DataFrame({
-        'Trio': st.session_state["trios"], 'Vitorias': 0, 'Sets_Ganhos': 0, 
+        'Trio (Entidade)': labels_trios, 'Vitorias': 0, 'Sets_Ganhos': 0, 
         'Tentos_Pro': 0, 'Tentos_Contra': 0, 'Saldo_Tentos': 0, 'Flores': 0
-    }).set_index('Trio')
+    }).set_index('Trio (Entidade)')
     
     for r_num, mesas in st.session_state["historico_rodadas"].items():
         for m_id, dados in mesas.items():
@@ -256,8 +262,10 @@ def reconstruir_classificacao_global():
 # --- LÓGICA DE GERAÇÃO DE CHAVES ---
 def gerar_rodada_web():
     limpar_placares_memoria()
+    labels_trios = [obter_label_trio(t) for t in st.session_state["trios_dados"]]
+    
     if st.session_state["rodada_atual"] == 1:
-        lista_rodada = list(st.session_state["trios"])
+        lista_rodada = list(labels_trios)
         random.shuffle(lista_rodada)
     else:
         df_ord = st.session_state["classificacao"].sort_values(by=['Vitorias', 'Sets_Ganhos', 'Saldo_Tentos'], ascending=False)
@@ -342,7 +350,7 @@ def desenhar_mesa_planta_baixa(j1, j2, mesa_num, s1, t1, f1, s2, t2, f2, tipo_jo
         texto_topo = "#000000"
         tag_titulo = "👑 GRANDE FINAL ABSOLUTA 👑"
         card_height = "420px"
-        fonte_trios = "1.5rem"
+        fonte_trios = "1.3rem"
         animacao_css = "animation: pulsarFinal 2s infinite ease-in-out;"
     elif tipo_jogo == "3place":
         borda_cor = "#cd7f32" 
@@ -350,7 +358,7 @@ def desenhar_mesa_planta_baixa(j1, j2, mesa_num, s1, t1, f1, s2, t2, f2, tipo_jo
         texto_topo = "#ffffff"
         tag_titulo = "🥉 DISPUTA DE 3º LUGAR 🥉"
         card_height = "400px"
-        fonte_trios = "1.3rem"
+        fonte_trios = "1.2rem"
     elif (s1 == 2 or s2 == 2):
         borda_cor = "#2b8a3e" 
         bg_topo = "#124027"
@@ -378,7 +386,7 @@ def desenhar_mesa_planta_baixa(j1, j2, mesa_num, s1, t1, f1, s2, t2, f2, tipo_jo
         
         <div style="text-align: center; width: 100%;">
             <div style="font-size: 0.75rem; color: #69db7c; font-weight: bold; text-transform: uppercase;">🛡️ Trio 1</div>
-            <div style="background: #04120a; color: #ffffff; padding: 6px 15px; border-radius: 8px; font-size: {fonte_trios}; font-weight: 900; display: inline-block; border: 1px solid #ffb703; max-width: 85%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{j1}</div>
+            <div style="background: #04120a; color: #ffffff; padding: 6px 15px; border-radius: 8px; font-size: {fonte_trios}; font-weight: 900; display: inline-block; border: 1px solid #ffb703; max-width: 95%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{j1}</div>
         </div>
         
         <div style="background-color: #04120a; border: 2px solid {borda_cor}; border-radius: 12px; padding: 10px; width: 90%; text-align: center; box-shadow: inset 0 2px 5px rgba(0,0,0,0.6);">
@@ -394,7 +402,7 @@ def desenhar_mesa_planta_baixa(j1, j2, mesa_num, s1, t1, f1, s2, t2, f2, tipo_jo
         </div>
         
         <div style="text-align: center; width: 100%;">
-            <div style="background: #04120a; color: #ffffff; padding: 6px 15px; border-radius: 8px; font-size: {fonte_trios}; font-weight: 900; display: inline-block; border: 1px solid #ffb703; max-width: 85%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{j2}</div>
+            <div style="background: #04120a; color: #ffffff; padding: 6px 15px; border-radius: 8px; font-size: {fonte_trios}; font-weight: 900; display: inline-block; border: 1px solid #ffb703; max-width: 95%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{j2}</div>
             <div style="font-size: 0.75rem; color: #69db7c; font-weight: bold; text-transform: uppercase; margin-top: 2px;">🛡️ Trio 2</div>
         </div>
     </div>
@@ -409,8 +417,8 @@ def renderizar_formulario_mesa_admin(m, j1, j2, sem_id):
     
     with c1:
         st.markdown(f"<h4 class='titulo-passo-admin'>• SETS (Passo 1)</h4>", unsafe_allow_html=True)
-        s1_in = st.number_input(f"Sets - Trio {j1}", 0, 2, int(s1), key=f"dir_s1_{m}_r{sem_id}", on_change=disparar_atualizacao_placar, args=(m, j1, j2))
-        s2_in = st.number_input(f"Sets - Trio {j2}", 0, 2, int(s2), key=f"dir_s2_{m}_r{sem_id}", on_change=disparar_atualizacao_placar, args=(m, j1, j2))
+        s1_in = st.number_input(f"Sets - Trio 1", 0, 2, int(s1), key=f"dir_s1_{m}_r{sem_id}", on_change=disparar_atualizacao_placar, args=(m, j1, j2))
+        s2_in = st.number_input(f"Sets - Trio 2", 0, 2, int(s2), key=f"dir_s2_{m}_r{sem_id}", on_change=disparar_atualizacao_placar, args=(m, j1, j2))
 
     jogo_encerrado = (s1_in == 2 or s2_in == 2)
     
@@ -420,18 +428,18 @@ def renderizar_formulario_mesa_admin(m, j1, j2, sem_id):
         else:
             st.markdown(f"<h4 class='titulo-passo-admin'>• TENTOS (Passo 2)</h4>", unsafe_allow_html=True)
             if s1_in == 2 and s2_in == 0:
-                st.number_input(f"Tentos - {j2} (Máx: 46)", 0, 46, min(int(t2), 46), key=f"dir_t2_{m}_r{sem_id}_2x0j1", on_change=disparar_atualizacao_placar, args=(m, j1, j2))
+                st.number_input(f"Tentos - Perdedor (Máx: 46)", 0, 46, min(int(t2), 46), key=f"dir_t2_{m}_r{sem_id}_2x0j1", on_change=disparar_atualizacao_placar, args=(m, j1, j2))
             elif s2_in == 2 and s1_in == 0:
-                st.number_input(f"Tentos - {j1} (Máx: 46)", 0, 46, min(int(t1), 46), key=f"dir_t1_{m}_r{sem_id}_2x0j2", on_change=disparar_atualizacao_placar, args=(m, j1, j2))
+                st.number_input(f"Tentos - Perdedor (Máx: 46)", 0, 46, min(int(t1), 46), key=f"dir_t1_{m}_r{sem_id}_2x0j2", on_change=disparar_atualizacao_placar, args=(m, j1, j2))
             else:
                 t1_val_str = "" if (t1 == 72 or t1 == 0) else str(t1)
                 t2_val_str = "" if (t2 == 72 or t2 == 0) else str(t2)
-                st.text_input(f"Tentos - {j1}", value=t1_val_str, key=f"dir_t1_{m}_r{sem_id}_2x1", on_change=disparar_atualizacao_placar, args=(m, j1, j2), placeholder="Tentos...")
-                st.text_input(f"Tentos - {j2}", value=t2_val_str, key=f"dir_t2_{m}_r{sem_id}_2x1", on_change=disparar_atualizacao_placar, args=(m, j1, j2), placeholder="Tentos...")
+                st.text_input(f"Tentos Trio 1", value=t1_val_str, key=f"dir_t1_{m}_r{sem_id}_2x1", on_change=disparar_atualizacao_placar, args=(m, j1, j2), placeholder="Tentos...")
+                st.text_input(f"Tentos Trio 2", value=t2_val_str, key=f"dir_t2_{m}_r{sem_id}_2x1", on_change=disparar_atualizacao_placar, args=(m, j1, j2), placeholder="Tentos...")
             
             st.markdown(f"<h4 class='titulo-passo-admin'>• FLORES (Passo 3)</h4>", unsafe_allow_html=True)
-            st.number_input(f"Flores - {j1}", 0, 20, int(f1), key=f"dir_f1_{m}_r{sem_id}", on_change=disparar_atualizacao_placar, args=(m, j1, j2))
-            st.number_input(f"Flores - {j2}", 0, 20, int(f2), key=f"dir_f2_{m}_r{sem_id}", on_change=disparar_atualizacao_placar, args=(m, j1, j2))
+            st.number_input(f"Flores Trio 1", 0, 20, int(f1), key=f"dir_f1_{m}_r{sem_id}", on_change=disparar_atualizacao_placar, args=(m, j1, j2))
+            st.number_input(f"Flores Trio 2", 0, 20, int(f2), key=f"dir_f2_{m}_r{sem_id}", on_change=disparar_atualizacao_placar, args=(m, j1, j2))
 
 # --- BARRA LATERAL PERSISTENTE ---
 with st.sidebar:
@@ -523,35 +531,50 @@ else:
     with aba_arena:
         if not st.session_state["torneio_iniciado"]:
             st.markdown("### 🎮 Inscrições de Trios Competidores")
-            nome_t = st.text_input("Nome Customizado do Torneio:", value="Torneio Aberto de Trios")
+            nome_t = st.text_input("Nome Customizado do Torneio:", value=st.session_state["nome_torneio"])
             
             if is_admin:
                 if st.session_state.get("trio_sendo_editado") is not None:
                     idx_edit = st.session_state["trio_sendo_editado"]
-                    nome_antigo = st.session_state["trios"][idx_edit]
+                    trio_antigo = st.session_state["trios_dados"][idx_edit]
                     with st.form("form_edicao"):
-                        novo_nome = st.text_input("Corrigir Nome do Trio:", value=nome_antigo)
+                        n_nome = st.text_input("Corrigir Nome do Trio:", value=trio_antigo["nome"])
+                        n_entidade = st.text_input("Corrigir Nome da Entidade (CTG/Clube):", value=trio_antigo["entidade"])
                         col_b1, col_b2 = st.columns(2)
                         with col_b1:
-                            if st.form_submit_button("💾 Salvar") and novo_nome.strip():
-                                st.session_state["trios"][idx_edit] = novo_nome.strip()
-                                st.session_state["trio_sendo_editado"] = None
-                                salvar_estado_no_disco(); st.rerun()
+                            if st.form_submit_button("💾 Salvar"):
+                                if n_nome.strip() and n_entidade.strip():
+                                    st.session_state["trios_dados"][idx_edit] = {"nome": n_nome.strip(), "entidade": n_entidade.strip()}
+                                    st.session_state["trio_sendo_editado"] = None
+                                    salvar_estado_no_disco(); st.rerun()
                         with col_b2:
                             if st.form_submit_button("❌ Cancelar"): st.session_state["trio_sendo_editado"] = None; st.rerun()
                 else:
-                    with st.form("cad", clear_on_submit=True):
-                        nj = st.text_input("Identificação / Nome do Trio:")
-                        if st.form_submit_button("➕ Cadastrar Trio") and nj:
-                            st.session_state["trios"].append(nj.strip())
-                            salvar_estado_no_disco(); st.rerun()
+                    # 🔔 DUAS CAIXAS DE CADASTRO TOTALMENTE SEPARADAS
+                    with st.form("cad_trio_novo", clear_on_submit=True):
+                        col_c1, col_c2 = st.columns(2)
+                        with col_c1:
+                            input_nome_trio = st.text_input("Nome do Trio:", placeholder="Ex: Os Gaudérios")
+                        with col_c2:
+                            input_nome_entidade = st.text_input("Nome da Entidade Vinculada:", placeholder="Ex: CTG Lalá")
+                        
+                        if st.form_submit_button("➕ Finalizar Cadastro do Trio"):
+                            if input_nome_trio.strip() and input_nome_entidade.strip():
+                                st.session_state["trios_dados"].append({
+                                    "nome": input_nome_trio.strip(),
+                                    "entidade": input_nome_entidade.strip()
+                                })
+                                salvar_estado_no_disco(); st.rerun()
+                            else:
+                                st.error("Por favor, preencha ambos os campos para registrar.")
                             
-            st.write(f"**Trios Registrados ({len(st.session_state['trios'])}):**")
-            if st.session_state["trios"]:
-                if is_admin:
-                    for idx, trio in enumerate(st.session_state["trios"]):
-                        c_nome, c_edit, c_excluir = st.columns([70, 15, 15])
-                        with c_nome: st.markdown(f"<p style='padding:8px; background-color:#0d301b; border-radius:6px; font-weight:bold; border: 1px solid #ffb703;'>🛡️ {trio}</p>", unsafe_allow_html=True)
+            st.write(f"**Trios Registrados ({len(st.session_state['trios_dados'])}):**")
+            if st.session_state["trios_dados"]:
+                for idx, t_d in enumerate(st.session_state["trios_dados"]):
+                    c_nome, c_edit, c_excluir = st.columns([70, 15, 15])
+                    with c_nome: 
+                        st.markdown(f"<p style='padding:8px; background-color:#0d301b; border-radius:6px; font-weight:bold; border: 1px solid #ffb703;'>🛡️ Trio: <b>{t_d['nome']}</b> | Vinculado ao: <i>{t_d['entidade']}</i></p>", unsafe_allow_html=True)
+                    if is_admin:
                         with c_edit:
                             st.markdown('<div class="botao-editar">', unsafe_allow_html=True)
                             if st.button("✏️", key=f"btn_edit_{idx}"): st.session_state["trio_sendo_editado"] = idx; st.rerun()
@@ -559,27 +582,26 @@ else:
                         with c_excluir:
                             st.markdown('<div class="botao-excluir">', unsafe_allow_html=True)
                             if st.button("🗑️", key=f"btn_del_{idx}"):
-                                st.session_state["trios"].pop(idx)
+                                st.session_state["trios_dados"].pop(idx)
                                 salvar_estado_no_disco(); st.rerun()
                             st.markdown('</div>', unsafe_allow_html=True)
-                else: st.info(", ".join(st.session_state["trios"]))
                 
-            if is_admin and len(st.session_state["trios"]) >= 4:
+            if is_admin and len(st.session_state["trios_dados"]) >= 4:
                 st.markdown("---")
                 if st.button("🃏 GERAR CHAVES E DISPARAR TORNEIO"):
                     st.session_state["nome_torneio"] = nome_t
-                    st.session_state["classificacao"] = pd.DataFrame({'Trio': st.session_state["trios"], 'Vitorias': 0, 'Sets_Ganhos': 0, 'Tentos_Pro': 0, 'Tentos_Contra': 0, 'Saldo_Tentos': 0, 'Flores': 0}).set_index('Trio')
+                    reconstruir_classificacao_global()
                     st.session_state["torneio_iniciado"] = True
                     gerar_rodada_web(); st.rerun()
         else:
             c_m1, c_m2, c_m3 = st.columns(3)
-            with c_m1: st.markdown(f'<div class="metric-panel"><div class="metric-val">{len(st.session_state["trios"])}</div><div class="metric-lbl">Trios na Arena</div></div>', unsafe_allow_html=True)
+            with c_m1: st.markdown(f'<div class="metric-panel"><div class="metric-val">{len(st.session_state["trios_dados"])}</div><div class="metric-lbl">Trios na Arena</div></div>', unsafe_allow_html=True)
             with c_m2:
                 fase_txt = f"Rodada {st.session_state['rodada_atual']} / 5" if not st.session_state["em_matamata"] else str(st.session_state["fase_matamata"])
                 st.markdown(f'<div class="metric-panel"><div class="metric-val">{fase_txt}</div><div class="metric-lbl">Estágio Atual</div></div>', unsafe_allow_html=True)
             with c_m3:
                 rei_f = "Ninguém" if st.session_state["classificacao"] is None else str(st.session_state["classificacao"]['Flores'].idxmax())
-                st.markdown(f'<div class="metric-panel"><div class="metric-val">🌸 {rei_f[:12]}</div><div class="metric-lbl">Líder das Flores</div></div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="metric-panel"><div class="metric-val">🌸 {rei_f[:15]}</div><div class="metric-lbl">Líder das Flores</div></div>', unsafe_allow_html=True)
 
             if st.session_state["campeao"]:
                 st.markdown("<h1 style='text-align:center; color:#ffb703 !important; font-weight:900; letter-spacing:2px; margin-top:20px;'>🏆 CERIMÔNIA DE PREMIAÇÃO</h1>", unsafe_allow_html=True)
@@ -614,17 +636,17 @@ else:
                     <div style="display: flex; align-items: flex-end; justify-content: center; gap: 20px; width: 100%; max-width: 950px; margin: 20px auto;">
                         <div style="flex: 1; background: linear-gradient(135deg, #ffffff, #b0b0b0); height: 210px; border-radius: 12px; text-align: center; padding: 20px 10px; box-shadow: 0px 15px 35px rgba(0,0,0,0.5); border: 2px solid #e0e0e0;">
                             <p style="font-size: 3.2rem; font-weight: 900; margin: 0; color: #111111;">2º</p>
-                            <div style="font-size: 1.4rem; font-weight: 900; text-transform: uppercase; color: #0b0f19;">🛡️ {vice}</div>
+                            <div style="font-size: 1.1rem; font-weight: 900; text-transform: uppercase; color: #0b0f19;">🛡️ {vice}</div>
                             <div style="font-size: 0.8rem; font-weight: bold; text-transform: uppercase; color: #333333;">🥈 Vice-Campeão</div>
                         </div>
                         <div style="flex: 1; background: linear-gradient(135deg, #ffe066, #ffb703); height: 270px; border-radius: 12px; text-align: center; padding: 25px 10px; border: 3px solid #ffffff; box-shadow: 0px 0px 30px rgba(255, 183, 3, 0.6);">
                             <p style="font-size: 3.5rem; font-weight: 900; margin: 0; color: #000000;">1º</p>
-                            <div style="font-size: 1.6rem; font-weight: 900; text-transform: uppercase; color: #0b0f19;">👑 {champ}</div>
+                            <div style="font-size: 1.3rem; font-weight: 900; text-transform: uppercase; color: #0b0f19;">👑 {champ}</div>
                             <div style="font-size: 0.8rem; font-weight: bold; text-transform: uppercase; color: #403000;">Campeão Absoluto</div>
                         </div>
                         <div style="flex: 1; background: linear-gradient(135deg, #e69d5e, #cd7f32); height: 170px; border-radius: 12px; text-align: center; padding: 15px 10px; box-shadow: 0px 15px 35px rgba(0,0,0,0.5); border: 2px solid #cd7f32;">
                             <p style="font-size: 2.8rem; font-weight: 900; margin: 0; color: #ffffff;">3º</p>
-                            <div style="font-size: 1.3rem; font-weight: 900; text-transform: uppercase; color: #ffffff;">🛡️ {third}</div>
+                            <div style="font-size: 1.1rem; font-weight: 900; text-transform: uppercase; color: #ffffff;">🛡️ {third}</div>
                             <div style="font-size: 0.8rem; font-weight: bold; text-transform: uppercase; color: #f0f0f0;">🥉 3º Colocado</div>
                         </div>
                     </div>
@@ -641,7 +663,7 @@ else:
                         except Exception: pass
                     lista_g.append(novo_registro)
                     with open(ARQUIVO_GALERIA, "w", encoding="utf-8") as f: json.dump(lista_g, f, ensure_ascii=False, indent=4)
-                    st.success("Resultados imortalizados!")
+                    st.success("Resultados imortalizados com sucesso!")
             else:
                 if st.session_state["cronometro_ativo"] and st.session_state["hora_inicio_rodada"]:
                     tl = st.session_state["hora_inicio_rodada"] + timedelta(minutes=45)
@@ -695,7 +717,7 @@ else:
                                 st.session_state["rodada_atual"] += 1
                                 if st.session_state["rodada_atual"] <= 5: gerar_rodada_web()
                                 else:
-                                    n_in = len(st.session_state["trios"])
+                                    n_in = len(st.session_state["trios_dados"])
                                     f_n = "OITAVAS DE FINAL" if n_in > 16 else ("QUARTAS DE FINAL" if n_in >= 8 else "SEMIFINAL")
                                     dv = st.session_state["classificacao"].sort_values(by=['Vitorias','Sets_Ganhos','Saldo_Tentos'], ascending=False)
                                     iniciar_fase_matamata(list(dv.index[:16 if n_in>16 else (8 if n_in>=8 else 4)]), f_n)
@@ -740,7 +762,7 @@ else:
 
     with aba_tabela:
         if st.session_state["classificacao"] is not None:
-            st.markdown("### 📊 Tabela Oficial de Pontuação dos Trios")
+            st.markdown("### 📊 Tabela Oficial de Pontuação dos Trios (Vinculados com a Entidade)")
             df_r = st.session_state["classificacao"].sort_values(by=['Vitorias','Sets_Ganhos','Saldo_Tentos'], ascending=False)
             st.table(df_r)
             
@@ -751,7 +773,7 @@ else:
                 if r_sel:
                     for m_id, dados in st.session_state["historico_rodadas"][r_sel].items():
                         if not dados.get("is_chapeu", False):
-                            st.markdown(f"**Mesa {m_id}: Trio {dados['j1']} VS Trio {dados['j2']}**")
+                            st.markdown(f"**Mesa {m_id}: {dados['j1']} VS {dados['j2']}**")
                             if is_admin:
                                 c_e1, c_e2 = st.columns(2)
                                 with c_e1:
@@ -797,7 +819,7 @@ st.markdown("""
             🚀 Desenvolvido por: <span style="color: #ffb703; font-weight: 900; letter-spacing: 0.5px;">Eduardo Luis Ferreira</span>
         </div>
         <div style="color: #ffffff; font-size: 0.85rem; font-weight: bold; display: flex; gap: 15px; align-items: center; text-shadow: 1px 1px 2px #000;">
-            <span>📦 Versão: <span style="color: #ffb703; font-weight: 900;">3.0.0-Trios</span></span>
+            <span>📦 Versão: <span style="color: #ffb703; font-weight: 900;">3.5.0-Trios_Full</span></span>
             <span style="color: #ffb703; font-weight: 900;">|</span>
             <span style="color: #69db7c; font-weight: 900; display: inline-flex; align-items: center; gap: 4px;">🟢 Central de Trios Online</span>
             <span style="color: #ffb703; font-weight: 900;">|</span>
