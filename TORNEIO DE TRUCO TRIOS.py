@@ -21,6 +21,7 @@ NOME_CRIADOR = "Eduardo Luis Ferreira"
 ARQUIVO_BACKUP = "torneio_atual_pb.json"
 ARQUIVO_GALERIA = "galeria_campeoes.json"
 CHAVE_ADMINISTRADOR = "truco123"
+TEMPO_CRONOMETRO_MINUTOS = 120  # ⏰ Ajustado rigorosamente para 2 horas
 
 # 🛠️ ESTILIZAÇÃO CSS PREMIUM AMBIENTE DE TRUCO (VERDE IMPERIAL + DOURADO PREMIUM)
 st.markdown("""
@@ -76,7 +77,7 @@ st.markdown("""
     }
     
     div[data-testid="stNumberInput"] label, div[data-testid="stTextInput"] label, div[data-testid="stSelectbox"] label {
-        color: #69db7c !important; /* Verde Menta Fluorescente para total leitura */
+        color: #69db7c !important; /* Verde Menta Fluorescente para leitura perfeita */
         font-size: 0.85rem !important;
         font-weight: bold !important;
         text-transform: uppercase;
@@ -157,10 +158,9 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- CONFIGURAÇÃO INICIAL RIGOROSA DOS ATRIBUTOS DE SESSÃO ---
-if "entidades" not in st.session_state: st.session_state["entidades"] = []
+# --- CONFIGURAÇÃO INICIAL DOS ATRIBUTOS DE SESSÃO ---
 if "jogadores" not in st.session_state: st.session_state["jogadores"] = []
-if "vinc_entidades" not in st.session_state: st.session_state["vinc_entidades"] = {} # Mapeamento Jogador -> Entidade
+if "vinc_entidades" not in st.session_state: st.session_state["vinc_entidades"] = {} # Mapeamento Trio -> Entidade/CTG
 if "torneio_iniciado" not in st.session_state: st.session_state["torneio_iniciado"] = False
 if "rodada_atual" not in st.session_state: st.session_state["rodada_atual"] = 1
 if "classificacao" not in st.session_state: st.session_state["classificacao"] = None
@@ -180,7 +180,6 @@ if "placares_rodada_atual" not in st.session_state: st.session_state["placares_r
 if "semente_reset" not in st.session_state: st.session_state["semente_reset"] = 1
 if "nome_torneio" not in st.session_state: st.session_state["nome_torneio"] = "Torneio de Truco"
 if "jogador_sendo_editado" not in st.session_state: st.session_state["jogador_sendo_editado"] = None
-if "entidade_sendo_editada" not in st.session_state: st.session_state["entidade_sendo_editada"] = None
 if "admin_logado" not in st.session_state: st.session_state["admin_logado"] = False
 
 # --- FUNÇÃO DE LIMPEZA DE MEMÓRIA ---
@@ -194,7 +193,6 @@ def limpar_placares_memoria():
 # --- PERSISTÊNCIA EM DISCO ---
 def salvar_estado_no_disco():
     estado = {
-        "entidades": st.session_state["entidades"],
         "jogadores": st.session_state["jogadores"],
         "vinc_entidades": st.session_state["vinc_entidades"],
         "torneio_iniciado": st.session_state["torneio_iniciado"],
@@ -225,7 +223,6 @@ def carregar_estado_do_disco():
         try:
             with open(ARQUIVO_BACKUP, "r", encoding="utf-8") as f:
                 estado = json.load(f)
-            st.session_state["entidades"] = estado.get("entidades", [])
             st.session_state["jogadores"] = estado.get("jogadores", [])
             st.session_state["vinc_entidades"] = estado.get("vinc_entidades", {})
             st.session_state["torneio_iniciado"] = estado.get("torneio_iniciado", False)
@@ -353,10 +350,10 @@ def salvar_mudanca_retroativa(r_alvo, m_id, j1, j2):
     st.session_state["historico_rodadas"][r_alvo][m_id]["f2"] = st.session_state.get(f"ret_f2_{r_alvo}_{m_id}", 0)
     reconstruir_classificacao_global()
 
-# --- CARDS DINÂMICOS DE MESA COM STATUS COLORIDO (PLANTA BAIXA PREMIUM) ---
+# --- CARDS DINÂMICOS DE MESA COM STATUS COLORIDO (PLANTA BAIXA) ---
 def desenhar_mesa_planta_baixa(j1, j2, mesa_num, s1, t1, f1, s2, t2, f2, tipo_jogo="normal"):
-    ent_j1 = st.session_state["vinc_entidades"].get(j1, "Sem Clube")
-    ent_j2 = st.session_state["vinc_entidades"].get(j2, "Sem Clube")
+    ent_j1 = st.session_state["vinc_entidades"].get(j1, "Sem Entidade")
+    ent_j2 = st.session_state["vinc_entidades"].get(j2, "Sem Entidade")
     
     animacao_css = ""
     if tipo_jogo == "final":
@@ -476,7 +473,7 @@ with st.sidebar:
     st.markdown("---")
     
     if is_admin:
-        if st.button("⏱️ Iniciar Cronômetro (45m)"):
+        if st.button(f"⏱️ Iniciar Cronômetro ({TEMPO_CRONOMETRO_MINUTOS}m)"):
             st.session_state["hora_inicio_rodada"] = datetime.now()
             st.session_state["cronometro_ativo"] = True
             salvar_estado_no_disco(); st.rerun()
@@ -491,22 +488,22 @@ with st.sidebar:
 # --- INTERFACE PRINCIPAL ---
 st.markdown(f"<h1 style='text-align:center; color:#ffb703; font-weight:900; margin-top:0;'>🃏 {st.session_state.get('nome_torneio', 'Torneio de Truco')}</h1>", unsafe_allow_html=True)
 
-# SELETOR DE MODO DE EXIBIÇÃO (ARENA VS TELÃO AUTOMÁTICO DE PROJETOR)
+# SELETOR DE MODO DE EXIBIÇÃO
 modo_exibicao = st.radio("Selecione o Modo de Visualização da Tela:", ["Arena de Gerenciamento", "🖥️ MODO TELÃO DE PROJETOR (Automático)"], horizontal=True)
 
 if modo_exibicao == "🖥️ MODO TELÃO DE PROJETOR (Automático)":
     st.markdown("<h2 style='text-align:center; color:#ffb703; margin-bottom:20px;'>📺 QUADRO OFICIAL DE CONFRONTOS</h2>", unsafe_allow_html=True)
     
-    # 1. Cronômetro Gigante Centralizado
+    # 1. Cronômetro de 2 Horas Centralizado
     if st.session_state["cronometro_ativo"] and st.session_state["hora_inicio_rodada"]:
-        tl = st.session_state["hora_inicio_rodada"] + timedelta(minutes=45)
+        tl = st.session_state["hora_inicio_rodada"] + timedelta(minutes=TEMPO_CRONOMETRO_MINUTOS)
         tr = tl - datetime.now()
         if tr.total_seconds() > 0:
-            st.markdown(f'<div class="cronometro-box-gigante"><span style="color:#ffffff; font-size:1.1rem; font-weight:bold; text-transform:uppercase; letter-spacing:2px; display:block; margin-bottom:5px;">⏱️ Tempo Restante de Jogo</span><div class="cronometro-tempo">{int(tr.total_seconds()//60):02d}:{int(tr.total_seconds()%60):02d}</div></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="cronometro-box-gigante"><span style="color:#ffffff; font-size:1.1rem; font-weight:bold; text-transform:uppercase; letter-spacing:2px; display:block; margin-bottom:5px;">⏱️ Tempo Restante da Rodada</span><div class="cronometro-tempo">{int(tr.total_seconds()//3600):02d}:{int((tr.total_seconds()%3600)//60):02d}:{int(tr.total_seconds()%60):02d}</div></div>', unsafe_allow_html=True)
         else:
             st.markdown('<div class="cronometro-box-gigante" style="border-color:#ff3232;"><div class="cronometro-tempo" style="color:#ff3232 !important;">⏰ TEMPO ESGOTADO</div></div>', unsafe_allow_html=True)
     
-    # 2. Grid de Mesas em Tamanho Gigante
+    # 2. Grid de Mesas
     if st.session_state["torneio_iniciado"]:
         if not st.session_state["em_matamata"]:
             grid_telao = st.columns(3)
@@ -551,77 +548,19 @@ else:
             st.markdown("### 🎮 Configurações e Inscrições")
             nome_t = st.text_input("Nome do Evento:", value="Torneio de Truco do CTG")
             
-            # --- SEÇÃO INTEGRAMENTE RECOMPOSTA DE ENTIDADES ---
+            # --- ÁREA DE CADASTRO LIMPA E DIRETA (COMO SOLICITADO) ---
             st.markdown("---")
-            st.markdown("### 🏢 Gestão de Entidades (Clubes / CTGs)")
-            
-            if is_admin:
-                if st.session_state.get("entidade_sendo_editada") is not None:
-                    idx_ent_edit = st.session_state["entidade_sendo_editada"]
-                    ent_antiga = st.session_state["entidades"][idx_ent_edit]
-                    with st.form("form_edicao_entidade"):
-                        novo_nome_ent = st.text_input("Corrigir Nome da Entidade:", value=ent_antiga)
-                        col_ent_b1, col_ent_b2 = st.columns(2)
-                        with col_ent_b1:
-                            if st.form_submit_button("💾 Salvar") and novo_nome_ent.strip():
-                                # Atualiza o mapeamento dos jogadores vinculados se mudar de nome
-                                velha_entidade = st.session_state["entidades"][idx_ent_edit]
-                                for j_k, e_v in list(st.session_state["vinc_entidades"].items()):
-                                    if e_v == velha_entidade:
-                                        st.session_state["vinc_entidades"][j_k] = novo_nome_ent.strip()
-                                st.session_state["entidades"][idx_ent_edit] = novo_nome_ent.strip()
-                                st.session_state["entidade_sendo_editada"] = None
-                                salvar_estado_no_disco(); st.rerun()
-                        with col_ent_b2:
-                            if st.form_submit_button("❌ Cancelar"): st.session_state["entidade_sendo_editada"] = None; st.rerun()
-                else:
-                    with st.form("cad_entidade", clear_on_submit=True):
-                        ne = st.text_input("Nome da Entidade:")
-                        if st.form_submit_button("➕ Cadastrar Entidade") and ne:
-                            if ne.strip() not in st.session_state["entidades"]:
-                                st.session_state["entidades"].append(ne.strip())
-                                salvar_estado_no_disco(); st.rerun()
-                            else:
-                                st.error("Entidade já cadastrada!")
-
-            st.write(f"**Entidades Registradas ({len(st.session_state['entidades'])}):**")
-            if st.session_state["entidades"]:
-                if is_admin:
-                    for idx, entidade in enumerate(st.session_state["entidades"]):
-                        c_ent_nome, c_ent_edit, c_ent_excluir = st.columns([70, 15, 15])
-                        with c_ent_nome: st.markdown(f"<p style='padding:8px; background-color:#12251a; border-radius:6px; font-weight:bold; border: 1px solid #69db7c;'>🏢 {entidade}</p>", unsafe_allow_html=True)
-                        with c_ent_edit:
-                            st.markdown('<div class="botao-editar">', unsafe_allow_html=True)
-                            if st.button("✏️", key=f"btn_ent_edit_{idx}"): st.session_state["entidade_sendo_editada"] = idx; st.rerun()
-                            st.markdown('</div>', unsafe_allow_html=True)
-                        with c_ent_excluir:
-                            st.markdown('<div class="botao-excluir">', unsafe_allow_html=True)
-                            if st.button("🗑️", key=f"btn_ent_del_{idx}"):
-                                removida = st.session_state["entidades"].pop(idx)
-                                # Limpa vínculos associados
-                                for j_k, e_v in list(st.session_state["vinc_entidades"].items()):
-                                    if e_v == removida:
-                                        del st.session_state["vinc_entidades"][j_k]
-                                salvar_estado_no_disco(); st.rerun()
-                            st.markdown('</div>', unsafe_allow_html=True)
-                else: st.info(", ".join(st.session_state["entidades"]))
-            else:
-                st.info("Nenhuma entidade cadastrada até o momento.")
-
-            # --- SEÇÃO DE COMPETIDORES ---
-            st.markdown("---")
-            st.markdown("### 🧔 Inscrições de Competidores")
+            st.markdown("### 🧔 Cadastro de Trios")
             
             if is_admin:
                 if st.session_state.get("jogador_sendo_editado") is not None:
                     idx_edit = st.session_state["jogador_sendo_editado"]
                     nome_antigo = st.session_state["jogadores"][idx_edit]
-                    ent_atual = st.session_state["vinc_entidades"].get(nome_antigo, "Sem Clube")
-                    opcoes_ent = ["Sem Clube"] + st.session_state["entidades"]
+                    ent_antiga = st.session_state["vinc_entidades"].get(nome_antigo, "")
                     
                     with st.form("form_edicao"):
-                        novo_nome = st.text_input("Corrigir Nome:", value=nome_antigo)
-                        nova_ent = st.selectbox("Alterar Entidade:", opcoes_ent, index=opcoes_ent.index(ent_atual) if ent_atual in opcoes_ent else 0)
+                        novo_nome = st.text_input("NOME DO TRIO:", value=nome_antigo)
+                        nova_ent = st.text_input("ENTIDADE / CTG:", value=ent_antiga)
                         col_b1, col_b2 = st.columns(2)
                         with col_b1:
                             if st.form_submit_button("💾 Salvar") and novo_nome.strip():
@@ -630,34 +569,33 @@ else:
                                     del st.session_state["vinc_entidades"][old_name]
                                 
                                 st.session_state["jogadores"][idx_edit] = novo_nome.strip()
-                                if nova_ent != "Sem Clube":
-                                    st.session_state["vinc_entidades"][novo_nome.strip()] = nova_ent
+                                if nova_ent.strip():
+                                    st.session_state["vinc_entidades"][novo_nome.strip()] = nova_ent.strip()
                                 st.session_state["jogador_sendo_editado"] = None
                                 salvar_estado_no_disco(); st.rerun()
                         with col_b2:
                             if st.form_submit_button("❌ Cancelar"): st.session_state["jogador_sendo_editado"] = None; st.rerun()
                 else:
-                    with st.form("cad", clear_on_submit=True):
-                        nj = st.text_input("Nome do Competidor:")
-                        opcoes_entidades = ["Sem Clube"] + st.session_state["entidades"]
-                        ent_vinculo = st.selectbox("Vincular à Entidade:", opcoes_entidades)
+                    with st.form("cad_simplificado", clear_on_submit=True):
+                        nj = st.text_input("NOME DO TRIO:")
+                        ne = st.text_input("ENTIDADE / CTG:")
                         
-                        if st.form_submit_button("➕ Cadastrar Competidor") and nj:
+                        if st.form_submit_button("➕ Cadastrar Trio") and nj:
                             nome_j_limpo = nj.strip()
                             if nome_j_limpo not in st.session_state["jogadores"]:
                                 st.session_state["jogadores"].append(nome_j_limpo)
-                                if ent_vinculo != "Sem Clube":
-                                    st.session_state["vinc_entidades"][nome_j_limpo] = ent_vinculo
+                                if ne.strip():
+                                    st.session_state["vinc_entidades"][nome_j_limpo] = ne.strip()
                                 salvar_estado_no_disco(); st.rerun()
                             else:
-                                st.error("Este competidor já está cadastrado!")
+                                st.error("Este trio já está cadastrado!")
                             
-            st.write(f"**Competidores Registrados ({len(st.session_state['jogadores'])}):**")
+            st.write(f"**Trios Registrados ({len(st.session_state['jogadores'])}):**")
             if st.session_state["jogadores"]:
                 if is_admin:
                     for idx, jogador in enumerate(st.session_state["jogadores"]):
                         c_nome, c_edit, c_excluir = st.columns([70, 15, 15])
-                        ent_pertencente = st.session_state["vinc_entidades"].get(jogador, "Sem Clube")
+                        ent_pertencente = st.session_state["vinc_entidades"].get(jogador, "Sem Entidade")
                         with c_nome: st.markdown(f"<p style='padding:8px; background-color:#0d301b; border-radius:6px; font-weight:bold; border: 1px solid #ffb703;'>🔹 {jogador} <small style='color: #69db7c;'>({ent_pertencente})</small></p>", unsafe_allow_html=True)
                         with c_edit:
                             st.markdown('<div class="botao-editar">', unsafe_allow_html=True)
@@ -672,7 +610,7 @@ else:
                                 salvar_estado_no_disco(); st.rerun()
                             st.markdown('</div>', unsafe_allow_html=True)
                 else:
-                    render_list = [f"{j} ({st.session_state['vinc_entidades'].get(j, 'Sem Clube')})" for j in st.session_state["jogadores"]]
+                    render_list = [f"{j} ({st.session_state['vinc_entidades'].get(j, 'Sem Entidade')})" for j in st.session_state["jogadores"]]
                     st.info(", ".join(render_list))
                 
             if is_admin and len(st.session_state["jogadores"]) >= 4:
@@ -684,7 +622,7 @@ else:
                     gerar_rodada_web(); st.rerun()
         else:
             c_m1, c_m2, c_m3 = st.columns(3)
-            with c_m1: st.markdown(f'<div class="metric-panel"><div class="metric-val">{len(st.session_state["jogadores"])}</div><div class="metric-lbl">Inscritos na Arena</div></div>', unsafe_allow_html=True)
+            with c_m1: st.markdown(f'<div class="metric-panel"><div class="metric-val">{len(st.session_state["jogadores"])}</div><div class="metric-lbl">Trios Inscritos</div></div>', unsafe_allow_html=True)
             with c_m2:
                 fase_txt = f"Rodada {st.session_state['rodada_atual']} / 5" if not st.session_state["em_matamata"] else str(st.session_state["fase_matamata"])
                 st.markdown(f'<div class="metric-panel"><div class="metric-val">{fase_txt}</div><div class="metric-lbl">Estágio Atual</div></div>', unsafe_allow_html=True)
@@ -755,19 +693,19 @@ else:
                     st.success("Resultados imortalizados!")
             else:
                 if st.session_state["cronometro_ativo"] and st.session_state["hora_inicio_rodada"]:
-                    tl = st.session_state["hora_inicio_rodada"] + timedelta(minutes=45)
+                    tl = st.session_state["hora_inicio_rodada"] + timedelta(minutes=TEMPO_CRONOMETRO_MINUTOS)
                     tr = tl - datetime.now()
                     if tr.total_seconds() > 0:
-                        st.markdown(f'<div class="cronometro-box-gigante"><div class="cronometro-tempo">{int(tr.total_seconds()//60):02d}:{int(tr.total_seconds()%60):02d}</div></div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="cronometro-box-gigante"><div class="cronometro-tempo">{int(tr.total_seconds()//3600):02d}:{int((tr.total_seconds()%3600)//60):02d}:{int(tr.total_seconds()%60):02d}</div></div>', unsafe_allow_html=True)
                     else: st.markdown('<div class="cronometro-box-gigante" style="border-color:#ff3232;"><div class="cronometro-tempo" style="color:#ff3232 !important;">⏰ TIMEOUT!</div></div>', unsafe_allow_html=True)
 
                 sem_id = st.session_state.get("semente_reset", 1)
 
                 if not st.session_state["em_matamata"]:
-                    st.markdown(f"### 📅 Rodada Corrente: {st.session_state['rodada_atual']} de 5")
+                    st.markdown(f"### 📅 Rodada Fechada/Corrente: {st.session_state['rodada_atual']} de 5")
                     for j1, j2 in st.session_state["confrontos"]:
                         if j2 == "CHAPÉU (Folga)":
-                            st.markdown(f'<div class="chapeu-container-novo"><div class="metric-lbl">🎩 Jogador no Chapéu (Folga)</div><div class="cronometro-tempo" style="font-size:2rem!important;">{j1}</div></div>', unsafe_allow_html=True)
+                            st.markdown(f'<div class="chapeu-container-novo"><div class="metric-lbl">🎩 Trio no Chapéu (Folga Regulamentar)</div><div class="cronometro-tempo" style="font-size:2rem!important;">{j1}</div></div>', unsafe_allow_html=True)
                     
                     cont = 1
                     for j1, j2 in st.session_state["confrontos"]:
@@ -812,7 +750,7 @@ else:
                                     iniciar_fase_matamata(list(dv.index[:16 if n_in>16 else (8 if n_in>=8 else 4)]), f_n)
                                 st.rerun()
                 else:
-                    st.markdown(f"### ⚡ Eliminatórias: {st.session_state['fase_matamata']}")
+                    st.markdown(f"### ⚡ Eliminatórias Directas: {st.session_state['fase_matamata']}")
                     for c in st.session_state["confrontos_mm"]:
                         m = c["id_original"]; j1, j2 = c["j1"], c["j2"]
                         p = st.session_state["placares_rodada_atual"].get(m, [0,0,0,0,0,0,False])
@@ -854,10 +792,9 @@ else:
             st.markdown("### 📊 Tabela Oficial de Pontuação")
             df_r = st.session_state["classificacao"].sort_values(by=['Vitorias','Sets_Ganhos','Saldo_Tentos'], ascending=False).copy()
             
-            # Adiciona coluna de Entidade na visualização da tabela para fins de auditoria completa
-            df_r['Entidade'] = [st.session_state["vinc_entidades"].get(j, "Sem Clube") for j in df_r.index]
-            # Reorganiza colunas colocando a entidade visível
-            df_r = df_r[['Entidade', 'Vitorias', 'Sets_Ganhos', 'Tentos_Pro', 'Tentos_Contra', 'Saldo_Tentos', 'Flores']]
+            # Adiciona a Entidade diretamente associada na tabela de auditoria
+            df_r['Entidade / CTG'] = [st.session_state["vinc_entidades"].get(j, "Sem Entidade") for j in df_r.index]
+            df_r = df_r[['Entidade / CTG', 'Vitorias', 'Sets_Ganhos', 'Tentos_Pro', 'Tentos_Contra', 'Saldo_Tentos', 'Flores']]
             st.table(df_r)
             
             if st.session_state["historico_rodadas"]:
@@ -894,7 +831,7 @@ else:
             except Exception: st.info("Galeria vazia.")
         else: st.info("Nenhum torneio imortalizado ainda.")
 
-# --- RODAPÉ INSTITUCIONAL PROFISSIONAL DE ULTRA CONTRASTE (SEM CINZA) ---
+# --- RODAPÉ INSTITUCIONAL PROFISSIONAL DE ULTRA CONTRASTE ---
 st.markdown("""
     <hr style="border: 0; border-top: 1px solid rgba(255, 183, 3, 0.4); margin-top: 60px; margin-bottom: 15px;">
     <div style="
@@ -913,7 +850,7 @@ st.markdown("""
             🚀 Desenvolvido por: <span style="color: #ffb703; font-weight: 900; letter-spacing: 0.5px;">Eduardo Luis Ferreira</span>
         </div>
         <div style="color: #ffffff; font-size: 0.85rem; font-weight: bold; display: flex; gap: 15px; align-items: center; text-shadow: 1px 1px 2px #000;">
-            <span>📦 Versão: <span style="color: #ffb703; font-weight: 900;">2.6.0-Stable</span></span>
+            <span>📦 Versão: <span style="color: #ffb703; font-weight: 900;">2.6.2-Stable</span></span>
             <span style="color: #ffb703; font-weight: 900;">|</span>
             <span style="color: #69db7c; font-weight: 900; display: inline-flex; align-items: center; gap: 4px;">🟢 Sistema Online</span>
             <span style="color: #ffb703; font-weight: 900;">|</span>
