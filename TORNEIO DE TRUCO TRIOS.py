@@ -155,6 +155,7 @@ if "semente_reset" not in st.session_state: st.session_state["semente_reset"] = 
 if "nome_torneio" not in st.session_state: st.session_state["nome_torneio"] = "Torneio de Truco"
 if "jogador_sendo_editado" not in st.session_state: st.session_state["jogador_sendo_editado"] = None
 if "admin_logado" not in st.session_state: st.session_state["admin_logado"] = False
+if "confrontos_realizados" not in st.session_state: st.session_state["confrontos_realizados"] = []
 
 def obter_entidade_do_trio(nome_trio):
     for j in st.session_state["jogadores"]:
@@ -189,7 +190,8 @@ def salvar_estado_no_disco():
         "terceiro_lugar": st.session_state["terceiro_lugar"],
         "quarto_lugar": st.session_state["quarto_lugar"],
         "placares_rodada_atual": st.session_state["placares_rodada_atual"],
-        "semente_reset": st.session_state.get("semente_reset", 1)
+        "semente_reset": st.session_state.get("semente_reset", 1),
+        "confrontos_realizados": st.session_state.get("confrontos_realizados", [])
     }
     if st.session_state["classificacao"] is not None:
         estado["classificacao"] = st.session_state["classificacao"].to_dict(orient="index")
@@ -216,6 +218,7 @@ def carregar_estado_do_disco():
             st.session_state["historico_rodadas"] = estado.get("historico_rodadas", {})
             st.session_state["placares_rodada_atual"] = estado.get("placares_rodada_atual", {})
             st.session_state["semente_reset"] = estado.get("semente_reset", 1)
+            st.session_state["confrontos_realizados"] = estado.get("confrontos_realizados", [])
             if estado.get("nome_torneio"): st.session_state["nome_torneio"] = estado.get("nome_torneio")
             if estado.get("classificacao") is not None: st.session_state["classificacao"] = pd.DataFrame.from_dict(estado["classificacao"], orient="index")
             if estado.get("hora_inicio_rodada"): st.session_state["hora_inicio_rodada"] = datetime.fromisoformat(estado["hora_inicio_rodada"])
@@ -233,12 +236,17 @@ def reconstruir_classificacao_global():
         'Tentos_Pro': 0, 'Tentos_Contra': 0, 'Saldo_Tentos': 0, 'Flores': 0
     }).set_index('Trio')
     
+    st.session_state["confrontos_realizados"] = []
+    
     for r_num, mesas in st.session_state["historico_rodadas"].items():
         for m_id, dados in mesas.items():
             if dados.get("is_chapeu", False):
                 st.session_state["classificacao"].loc[dados["j1"], ['Vitorias', 'Amarrados_Ganhos', 'Tentos_Pro']] += [1, 3, 72]
             else:
                 j1, j2 = dados["j1"], dados["j2"]
+                # Alimenta a memória global de confrontos realizados para evitar repetição
+                st.session_state["confrontos_realizados"].append(sorted([j1, j2]))
+                
                 s1, s2, t1, t2, f1, f2 = dados["s1"], dados["s2"], dados["t1"], dados["t2"], dados["f1"], dados["f2"]
                 s1_c = 3 if (s1 == 2 and s2 == 0) else s1
                 s2_c = 3 if (s2 == 2 and s1 == 0) else s2
@@ -250,74 +258,80 @@ def reconstruir_classificacao_global():
     st.session_state["classificacao"]['Saldo_Tentos'] = st.session_state["classificacao"]['Tentos_Pro'] - st.session_state["classificacao"]['Tentos_Contra']
     salvar_estado_no_disco()
 
-# --- ALGORITMO INTELIGENTE DE EMPARELHAMENTO (ANTI-CONFRONTO DA MESMA ENTIDADE) ---
+# --- ALGORITMO ANTIDUPLICIDADE E ANTI-ENTIDADE ---
 def gerar_rodada_web():
     limpar_placares_memoria()
     st.session_state["confrontos"] = []
     
-    if st.session_state["rodada_atual"] == 1:
-        # Lógica especial anti-entidade para a Rodada 1
-        lista_original = list(st.session_state["jogadores"])
-        sucesso = False
+    lista_trios_dados = list(st.session_state["jogadores"])
+    
+    # Ordena pelo suíço se não for a primeira rodada
+    if st.session_state["rodada_atual"] > 1:
+        df_ord = st.session_state["classificacao"].sort_values(by=['Vitorias', 'Amarrados_Ganhos', 'Saldo_Tentos'], ascending=False)
+        ordem_nomes = list(df_ord.index)
+        lista_trios_dados = [next(j for j in lista_trios_dados if j["trio"] == nome) for nome in ordem_nomes]
+
+    sucesso = False
+    
+    # Tenta até 2000 vezes encontrar um emparelhamento sem repetições de jogo e preferencialmente sem mesma entidade
+    for tentativa in range(2000):
+        lista_trabalho = list(lista_trios_dados)
+        confrontos_temp = []
+        jogadores_no_chapeu_temp = set(st.session_state["jogadores_no_chapeu"])
         
-        for tentativa in range(500): # Tenta encontrar uma combinação válida
-            random.shuffle(lista_original)
-            lista_teste = list(lista_original)
-            confrontos_temp = []
-            jogadores_no_chapeu_temp = set(st.session_state["jogadores_no_chapeu"])
+        # Sorteia chapéu se ímpar
+        if len(lista_trabalho) % 2 != 0:
+            cand = [j for j in lista_trabalho if j["trio"] not in jogadores_no_chapeu_temp]
+            chapeu_escolhido = random.choice(cand if cand else lista_trabalho)
+            lista_trabalho.remove(chapeu_escolhido)
+            confrontos_temp.append((chapeu_escolhido["trio"], "CHAPÉU (Folga)"))
             
-            # Trata o chapéu se for ímpar
-            if len(lista_teste) % 2 != 0:
-                cand = [j for j in lista_teste if j["trio"] not in jogadores_no_chapeu_temp]
-                chapeu_escolhido = random.choice(cand if cand else lista_teste)
-                lista_teste.remove(chapeu_escolhido)
-                confrontos_temp.append((chapeu_escolhido["trio"], "CHAPÉU (Folga)"))
+        quebra_regras = False
+        parceiros_rodada = []
+        
+        while len(lista_trabalho) >= 2:
+            j1 = lista_trabalho.pop(0)
+            achou_par = False
             
-            conflito_entidade = False
-            parceiros_rodada = []
-            
-            while len(lista_teste) >= 2:
-                j1 = lista_teste.pop(0)
-                # Procura alguém de entidade diferente
-                achou_par = False
-                for idx, j2 in enumerate(lista_teste):
-                    if j1["entidade"] != j2["entidade"]:
-                        lista_teste.pop(idx)
+            # Primeira passada limpa: Sem repetição de jogo E sem mesma entidade
+            for idx, j2 in enumerate(lista_trabalho):
+                jogo_par = sorted([j1["trio"], j2["trio"]])
+                if (jogo_par not in st.session_state["confrontos_realizados"]) and (j1["entidade"] != j2["entidade"]):
+                    lista_trabalho.pop(idx)
+                    parceiros_rodada.append((j1["trio"], j2["trio"]))
+                    achou_par = True
+                    break
+                    
+            # Segunda passada de tolerância: Sem repetição de jogo (mas aceita mesma entidade se crucial)
+            if not achou_par:
+                for idx, j2 in enumerate(lista_trabalho):
+                    jogo_par = sorted([j1["trio"], j2["trio"]])
+                    if jogo_par not in st.session_state["confrontos_realizados"]:
+                        lista_trabalho.pop(idx)
                         parceiros_rodada.append((j1["trio"], j2["trio"]))
                         achou_par = True
                         break
-                if not achou_par:
-                    # Se sobrou apenas mesma entidade, aceita o conflito inevitável nesta simulação
-                    j2 = lista_teste.pop(0)
-                    parceiros_rodada.append((j1["trio"], j2["trio"]))
-                    conflito_entidade = True
+                        
+            # Último caso matemático crítico: Aceita qualquer um não pareado para evitar travamento
+            if not achou_par:
+                j2 = lista_trabalho.pop(0)
+                parceiros_rodada.append((j1["trio"], j2["trio"]))
+                # Se for menor que a tentativa 1500, força refazer para buscar o cenário ideal sem repetição
+                if tentativa < 1500:
+                    quebra_regras = True
+                    break
             
-            if not conflito_entidade or tentativa == 499:
-                confrontos_temp.extend(parceiros_rodada)
-                if len(lista_original) % 2 != 0:
-                    for c in confrontos_temp:
-                        if c[1] == "CHAPÉU (Folga)":
-                            st.session_state["jogadores_no_chapeu"].add(c[0])
-                st.session_state["confrontos"] = confrontos_temp
-                sucesso = True
-                break
-    else:
-        # Rodadas subsequentes (Suíço baseado na classificação)
-        df_ord = st.session_state["classificacao"].sort_values(by=['Vitorias', 'Amarrados_Ganhos', 'Saldo_Tentos'], ascending=False)
-        lista_rodada = list(df_ord.index)
+        if not quebra_regras:
+            confrontos_temp.extend(parceiros_rodada)
+            if len(st.session_state["jogadores"]) % 2 != 0:
+                for c in confrontos_temp:
+                    if c[1] == "CHAPÉU (Folga)":
+                        st.session_state["jogadores_no_chapeu"].add(c[0])
+            st.session_state["confrontos"] = confrontos_temp
+            sucesso = True
+            break
 
-        if len(lista_rodada) % 2 != 0:
-            cand = [j for j in lista_rodada if j not in st.session_state["jogadores_no_chapeu"]]
-            chapeu = random.choice(cand if cand else lista_rodada)
-            lista_rodada.remove(chapeu)
-            st.session_state["jogadores_no_chapeu"].add(chapeu)
-            st.session_state["confrontos"].append((chapeu, "CHAPÉU (Folga)"))
-
-        # Cruzamento Suíço padrão (Melhores de cima contra melhores)
-        for i in range(0, len(lista_rodada), 2):
-            st.session_state["confrontos"].append((lista_rodada[i], lista_rodada[i+1]))
-
-    # Inicializa os placares das mesas criadas
+    # Inicializa os placares das novas mesas
     contador_mesa = 1
     for j1, j2 in st.session_state["confrontos"]:
         if j2 != "CHAPÉU (Folga)":
@@ -336,11 +350,12 @@ def iniciar_fase_matamata(lista_jogadores, nome_fase):
     
     if nome_fase == "FINAL E TERCEIRO": return 
 
-    n = len(lista_jogadores)
-    for i in range(n // 2):
-        id_m = str(i+1)
-        st.session_state["confrontos_mm"].append({"id_original": id_m, "tipo": "normal", "j1": lista_jogadores[i], "j2": lista_jogadores[n-1-i]})
-        st.session_state["placares_rodada_atual"][id_m] = [0, 0, 0, 0, 0, 0, False]
+    # chaveamento tradicional Olímpico de Semifinal (1º vs 4º e 2º vs 3º)
+    if nome_fase == "SEMIFINAL":
+        st.session_state["confrontos_mm"].append({"id_original": "1", "tipo": "normal", "j1": lista_jogadores[0], "j2": lista_jogadores[3]})
+        st.session_state["confrontos_mm"].append({"id_original": "2", "tipo": "normal", "j1": lista_jogadores[1], "j2": lista_jogadores[2]})
+        st.session_state["placares_rodada_atual"]["1"] = [0, 0, 0, 0, 0, 0, False]
+        st.session_state["placares_rodada_atual"]["2"] = [0, 0, 0, 0, 0, 0, False]
     
     st.session_state["hora_inicio_rodada"] = None
     st.session_state["cronometro_ativo"] = False
@@ -353,7 +368,6 @@ def disparar_atualizacao_placar(m_str, j1, j2):
     s2 = st.session_state.get(f"dir_s2_{m_str}_r{sem}", 0)
     p_antigo = st.session_state["placares_rodada_atual"].get(m_str, [0, 0, 0, 0, 0, 0, False])
     
-    # AJUSTADO PARA O MÁXIMO DE 48 TENTOS (REGRAS MTG)
     if (s1 == 2 and s2 == 0):
         t1, t2 = 72, min(st.session_state.get(f"dir_t2_{m_str}_r{sem}_2x0j1", p_antigo[3]), 48)
     elif (s2 == 2 and s1 == 0):
@@ -620,7 +634,7 @@ else:
                 
             if is_admin and len(st.session_state["jogadores"]) >= 4:
                 st.markdown("---")
-                if st.button("🃏 GERAR CHAVES ANTI-CONFLITO E INICIAR"):
+                if st.button("🃏 GERAR COMPACTO HISTÓRICO ANTI-DUPLICIDADE E INICIAR"):
                     st.session_state["nome_torneio"] = nome_t
                     
                     nomes_trios = [j["trio"] for j in st.session_state["jogadores"]]
@@ -631,6 +645,7 @@ else:
                         'Tentos_Pro': 0, 'Tentos_Contra': 0, 'Saldo_Tentos': 0, 'Flores': 0
                     }).set_index('Trio')
                     
+                    st.session_state["confrontos_realizados"] = []
                     st.session_state["torneio_iniciado"] = True
                     gerar_rodada_web(); st.rerun()
         else:
@@ -757,10 +772,9 @@ else:
                                 st.session_state["rodada_atual"] += 1
                                 if st.session_state["rodada_atual"] <= 5: gerar_rodada_web()
                                 else:
-                                    n_in = len(st.session_state["jogadores"])
-                                    f_n = "OITAVAS DE FINAL" if n_in > 16 else ("QUARTAS DE FINAL" if n_in >= 8 else "SEMIFINAL")
+                                    # CORREÇÃO DA TRANSIÇÃO DA QUINTA RODADA -> APENAS OS 4 MELHORES PASSAM DIRETO PARA A SEMIFINAL
                                     dv = st.session_state["classificacao"].sort_values(by=['Vitorias','Amarrados_Ganhos','Saldo_Tentos'], ascending=False)
-                                    iniciar_fase_matamata(list(dv.index[:16 if n_in>16 else (8 if n_in>=8 else 4)]), f_n)
+                                    iniciar_fase_matamata(list(dv.index[:4]), "SEMIFINAL")
                                 st.rerun()
                 else:
                     st.markdown(f"### ⚡ Eliminatórias: {st.session_state['fase_matamata']}")
@@ -791,9 +805,7 @@ else:
                                     elif c["tipo"]=="final": st.session_state["campeao"]=w; st.session_state["vice_campeao"]=l
                                     elif c["tipo"]=="3place": st.session_state["terceiro_lugar"]=w; st.session_state["quarto_lugar"]=l
                                 f_at = st.session_state["fase_matamata"]
-                                if f_at == "OITAVAS DE FINAL": iniciar_fase_matamata(venc, "QUARTAS DE FINAL")
-                                elif f_at == "QUARTAS DE FINAL": iniciar_fase_matamata(venc, "SEMIFINAL")
-                                elif f_at == "SEMIFINAL":
+                                if f_at == "SEMIFINAL":
                                     limpar_placares_memoria()
                                     st.session_state["fase_matamata"] = "FINAL E TERCEIRO"
                                     st.session_state["confrontos_mm"] = [{"id_original": "1", "tipo": "final", "j1": venc[0], "j2": venc[1]}, {"id_original": "2", "tipo": "3place", "j1": perd[0], "j2": perd[1]}]
@@ -859,7 +871,7 @@ st.markdown("""
             🚀 Desenvolvido por: <span style="color: #ffb703; font-weight: 900; letter-spacing: 0.5px;">Eduardo Luis Ferreira</span>
         </div>
         <div style="color: #ffffff; font-size: 0.85rem; font-weight: bold; display: flex; gap: 15px; align-items: center; text-shadow: 1px 1px 2px #000;">
-            <span>📦 Versão: <span style="color: #ffb703; font-weight: 900;">2.6.0-Stable-MTG</span></span>
+            <span>📦 Versão: <span style="color: #ffb703; font-weight: 900;">2.7.0-Stable-MTG</span></span>
             <span style="color: #ffb703; font-weight: 900;">|</span>
             <span style="color: #69db7c; font-weight: 900; display: inline-flex; align-items: center; gap: 4px;">🟢 Sistema Online</span>
             <span style="color: #ffb703; font-weight: 900;">|</span>
