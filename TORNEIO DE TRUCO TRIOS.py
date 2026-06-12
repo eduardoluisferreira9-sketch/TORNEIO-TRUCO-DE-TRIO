@@ -4,6 +4,10 @@ import pandas as pd
 import random
 import json
 import os
+import socket
+import requests 
+from PIL import Image 
+from io import BytesIO
 from datetime import datetime, timedelta
 
 # 🃏 CONFIGURAÇÃO DA PÁGINA PREMIUM ULTRA WIDE
@@ -17,6 +21,7 @@ NOME_CRIADOR = "Eduardo Luis Ferreira"
 ARQUIVO_BACKUP = "torneio_atual_pb_trios.json"
 ARQUIVO_GALERIA = "galeria_campeoes_trios.json"
 CHAVE_ADMINISTRADOR = "truco123"
+TEMPO_CRONOMETRO_MINUTOS = 120  # ⏰ Ajustado rigorosamente para 2 horas (120 minutos)
 
 # 🛠️ ESTILIZAÇÃO CSS PREMIUM AMBIENTE DE TRUCO (VERDE IMPERIAL + DOURADO PREMIUM)
 st.markdown("""
@@ -144,7 +149,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- CONFIGURAÇÃO INICIAL DOS ATRIBUTOS DE SESSÃO MUDADOS PARA TRIOS ---
+# --- CONFIGURAÇÃO INICIAL DOS ATRIBUTOS DE SESSÃO PARA TRIOS ---
 if "trios_dados" not in st.session_state: st.session_state["trios_dados"] = []
 if "torneio_iniciado" not in st.session_state: st.session_state["torneio_iniciado"] = False
 if "rodada_atual" not in st.session_state: st.session_state["rodada_atual"] = 1
@@ -336,7 +341,7 @@ def salvar_mudanca_retroativa(r_alvo, m_id, j1, j2):
     st.session_state["historico_rodadas"][r_alvo][m_id]["f2"] = st.session_state.get(f"ret_f2_{r_alvo}_{m_id}", 0)
     reconstruir_classificacao_global()
 
-# --- CARDS MESA COM DISTRIBUIÇÃO IDENTICA À DO DESENHO ENVIADO ---
+# --- CARDS MESA COM DISTRIBUIÇÃO INTERCALADA OFICIAL ---
 def desenhar_mesa_planta_baixa(j1, j2, mesa_num, s1, t1, f1, s2, t2, f2, tipo_jogo="normal"):
     animacao_css = ""
     if tipo_jogo == "final":
@@ -521,7 +526,8 @@ with st.sidebar:
     st.markdown("---")
     
     if is_admin:
-        if st.button("⏱️ Iniciar Cronômetro (45m)"):
+        # Botão dinâmico lendo a constante global regulamentada para 120 minutos
+        if st.button(f"⏱️ Iniciar Cronômetro ({TEMPO_CRONOMETRO_MINUTOS}m)"):
             st.session_state["hora_inicio_rodada"] = datetime.now()
             st.session_state["cronometro_ativo"] = True
             salvar_estado_no_disco(); st.rerun()
@@ -542,10 +548,11 @@ if modo_exibicao == "🖥️ MODO TELÃO DE PROJETOR (Automático)":
     st.markdown("<h2 style='text-align:center; color:#ffb703; margin-bottom:20px;'>📺 QUADRO OFICIAL DE CONFRONTOS</h2>", unsafe_allow_html=True)
     
     if st.session_state["cronometro_ativo"] and st.session_state["hora_inicio_rodada"]:
-        tl = st.session_state["hora_inicio_rodada"] + timedelta(minutes=45)
+        # Cálculo exato baseado na constante de 120 minutos (2 Horas)
+        tl = st.session_state["hora_inicio_rodada"] + timedelta(minutes=TEMPO_CRONOMETRO_MINUTOS)
         tr = tl - datetime.now()
         if tr.total_seconds() > 0:
-            st.markdown(f'<div class="cronometro-box-gigante"><span style="color:#ffffff; font-size:1.1rem; font-weight:bold; text-transform:uppercase; letter-spacing:2px; display:block; margin-bottom:5px;">⏱️ Tempo Restante de Jogo</span><div class="cronometro-tempo">{int(tr.total_seconds()//60):02d}:{int(tr.total_seconds()%60):02d}</div></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="cronometro-box-gigante"><span style="color:#ffffff; font-size:1.1rem; font-weight:bold; text-transform:uppercase; letter-spacing:2px; display:block; margin-bottom:5px;">⏱️ Tempo Restante de Jogo</span><div class="cronometro-tempo">{int(tr.total_seconds()//3600):02d}:{int((tr.total_seconds()%3600)//60):02d}:{int(tr.total_seconds()%60):02d}</div></div>', unsafe_allow_html=True)
         else:
             st.markdown('<div class="cronometro-box-gigante" style="border-color:#ff3232;"><div class="cronometro-tempo" style="color:#ff3232 !important;">⏰ TEMPO ESGOTADO</div></div>', unsafe_allow_html=True)
     
@@ -871,7 +878,7 @@ st.markdown("""
             🚀 Desenvolvido por: <span style="color: #ffb703; font-weight: 900; letter-spacing: 0.5px;">Eduardo Luis Ferreira</span>
         </div>
         <div style="color: #ffffff; font-size: 0.85rem; font-weight: bold; display: flex; gap: 15px; align-items: center; text-shadow: 1px 1px 2px #000;">
-            <span>📦 Versão: <span style="color: #ffb703; font-weight: 900;">3.7.2-Layout_Oficial_Intercalado</span></span>
+            <span>📦 Versão: <span style="color: #ffb703; font-weight: 900;">3.7.5-Cronometro_2H</span></span>
             <span style="color: #ffb703; font-weight: 900;">|</span>
             <span style="color: #69db7c; font-weight: 900; display: inline-flex; align-items: center; gap: 4px;">🟢 Central de Trios Online</span>
             <span style="color: #ffb703; font-weight: 900;">|</span>
